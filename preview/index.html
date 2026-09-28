@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EyeCare 20-20-20 护眼助手仿真预览</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- 整个工作区容器：左侧手机模型 + 右侧参数控制面板 -->
+  <div class="workspace-layout">
+
+    <!-- 手机模型展示区 -->
+    <section class="phone-viewport-container">
+      <div class="phone-device" id="phoneDevice">
+        <!-- 侧边物理按键视觉模拟 -->
+        <div class="phone-button volume-up"></div>
+        <div class="phone-button volume-down"></div>
+        <div class="phone-button power-button"></div>
+
+        <!-- 手机屏幕 -->
+        <div class="phone-screen" id="phoneScreen">
+          <!-- 顶部状态栏 -->
+          <header class="status-bar">
+            <span class="status-time" id="statusTime">09:41</span>
+            <div class="dynamic-island">
+              <span class="camera-lens"></span>
+            </div>
+            <div class="status-icons">
+              <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 19.4c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0l1.9-1.9C9.28 19.64 10.58 20 12 20c4.97 0 9-4.03 9-9s-4.03-9-9-9zm0 15c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6z"/>
+              </svg>
+              <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A16.88 16.88 0 0 0 12 4z"/>
+              </svg>
+              <div class="battery-icon">
+                <div class="battery-level"></div>
+              </div>
+            </div>
+          </header>
+
+          <!-- 模拟手机当前正在运行的应用界面（文章阅读/工作流） -->
+          <main class="simulated-app-content">
+            <div class="app-hero-card">
+              <span class="app-tag">深度阅读</span>
+              <h2 class="app-title">健康用眼：20-20-20 科学远眺法</h2>
+              <p class="app-meta">发布于 3 分钟前 · 阅读时间约 10 分钟</p>
+            </div>
+
+            <article class="article-body">
+              <p>长时间紧盯屏幕会导致眼部睫状肌持续紧张收缩，进而引发视疲劳、眼干以及暂时性视力模糊。</p>
+              <div class="infographic-box">
+                <div class="info-metric">
+                  <span class="metric-number">20</span>
+                  <span class="metric-unit">分钟</span>
+                  <span class="metric-desc">持续近距离注视屏幕后</span>
+                </div>
+                <div class="info-arrow">➔</div>
+                <div class="info-metric">
+                  <span class="metric-number">20</span>
+                  <span class="metric-unit">英尺</span>
+                  <span class="metric-desc">远眺 6 米之外景物</span>
+                </div>
+                <div class="info-arrow">➔</div>
+                <div class="info-metric">
+                  <span class="metric-number">20</span>
+                  <span class="metric-unit">秒</span>
+                  <span class="metric-desc">闭目或放松睫状肌</span>
+                </div>
+              </div>
+              <p>科学建议每使用电子屏幕 20 分钟，便将视线转向至少 20 英尺（约 6 米）外的远景，并保持 20 秒，让睫状肌彻底从持续紧绷中恢复弹性。</p>
+              <p>本程序采用<strong>纯视觉静音与无震动</strong>提醒，完全通过屏幕柔和半透明暗色遮罩自动引导，在不打扰会议或沉浸工作的前提下保护视力健康。</p>
+            </article>
+
+            <!-- 底部模拟导航条 -->
+            <nav class="simulated-bottom-nav">
+              <div class="nav-item active">首页</div>
+              <div class="nav-item">健康</div>
+              <div class="nav-item">数据</div>
+              <div class="nav-item">我的</div>
+            </nav>
+          </main>
+
+          <!-- 手机熄屏时的黑屏遮罩层 -->
+          <div class="screen-off-mask" id="screenOffMask">
+            <div class="screen-off-hint">已锁屏 / 计时已暂停</div>
+          </div>
+
+          <!-- 核心：全屏半透明护眼遮罩（纯视觉无声音无震动，倒计时结束后自动平滑淡出） -->
+          <div class="eye-care-overlay" id="eyeCareOverlay" aria-hidden="true">
+            <div class="overlay-backdrop"></div>
+            <div class="overlay-content">
+              <!-- 护眼柔和光环与 SVG 倒计时环形进度圈 -->
+              <div class="timer-ring-wrapper">
+                <svg class="timer-svg" viewBox="0 0 200 200">
+                  <circle class="ring-bg" cx="100" cy="100" r="88" />
+                  <circle class="ring-progress" id="ringProgress" cx="100" cy="100" r="88" />
+                </svg>
+                <div class="timer-center-text">
+                  <span class="countdown-seconds" id="countdownSeconds">20</span>
+                  <span class="countdown-unit">秒</span>
+                </div>
+              </div>
+
+              <!-- 提示文案 -->
+              <div class="overlay-guidance">
+                <h3 class="guidance-title" id="guidanceTitle">远眺放松时刻</h3>
+                <p class="guidance-desc" id="guidanceDesc">请将视线移开屏幕，眺望 6 米（20英尺）外的景物</p>
+                <p class="guidance-subtip">无需任何操作，倒计时归零后将自动淡出恢复</p>
+              </div>
+
+              <!-- 倒计时进度状态条（底部微型辅助光条） -->
+              <div class="ambient-pulse-bar"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 底部 Home Indicator 条 -->
+        <div class="phone-home-indicator"></div>
+      </div>
+    </section>
+
+    <!-- 右侧参数调控与测试面板 -->
+    <aside class="control-panel-container">
+      <div class="panel-header">
+        <div class="panel-badge">Web 仿真预览器</div>
+        <h1 class="panel-title">EyeCare 20-20-20</h1>
+        <p class="panel-subtitle">纯视觉静音无打扰 · 交互与参数实时调优</p>
+      </div>
+
+      <!-- 状态监控看板 -->
+      <section class="panel-card status-card">
+        <h2 class="card-title">当前运行状态</h2>
+        <div class="status-grid">
+          <div class="status-item">
+            <span class="label">屏幕状态</span>
+            <span class="value" id="dispScreenState">亮屏中 (计时运行)</span>
+          </div>
+          <div class="status-item">
+            <span class="label">累计亮屏</span>
+            <span class="value accent" id="dispScreenTime">00:00</span>
+          </div>
+          <div class="status-item">
+            <span class="label">下一次触发</span>
+            <span class="value" id="dispTargetTime">10 秒后 (测试)</span>
+          </div>
+          <div class="status-item">
+            <span class="label">遮罩状态</span>
+            <span class="value" id="dispOverlayState">就绪中</span>
+          </div>
+        </div>
+
+        <div class="action-btn-group">
+          <button class="btn btn-secondary" id="btnToggleScreen" type="button">
+            <span class="btn-icon">⏻</span>
+            <span id="btnToggleScreenText">模拟熄屏/锁屏</span>
+          </button>
+          <button class="btn btn-secondary" id="btnResetTimer" type="button">
+            <span class="btn-icon">↺</span>
+            <span>重置亮屏计时</span>
+          </button>
+          <button class="btn btn-primary" id="btnTriggerNow" type="button">
+            <span class="btn-icon">▶</span>
+            <span>立即弹出遮罩测试</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- 视觉样式调节 -->
+      <section class="panel-card">
+        <h2 class="card-title">遮罩视觉参数微调</h2>
+
+        <!-- 不透明度 -->
+        <div class="control-row">
+          <div class="control-label-row">
+            <label for="inputOpacity">遮罩不透明度 (Opacity)</label>
+            <span class="param-val" id="valOpacity">0.82</span>
+          </div>
+          <input type="range" id="inputOpacity" min="0.30" max="0.95" step="0.01" value="0.82">
+        </div>
+
+        <!-- 毛玻璃模糊度 -->
+        <div class="control-row">
+          <div class="control-label-row">
+            <label for="inputBlur">毛玻璃模糊度 (Backdrop Blur)</label>
+            <span class="param-val" id="valBlur">12px</span>
+          </div>
+          <input type="range" id="inputBlur" min="0" max="30" step="1" value="12">
+        </div>
+
+        <!-- 倒计时数字字号 -->
+        <div class="control-row">
+          <div class="control-label-row">
+            <label for="inputFontScale">倒计时数字字号 (Font Size)</label>
+            <span class="param-val" id="valFontScale">64px</span>
+          </div>
+          <input type="range" id="inputFontScale" min="40" max="96" step="2" value="64">
+        </div>
+
+        <!-- 标题与文案字号 -->
+        <div class="control-row">
+          <div class="control-label-row">
+            <label for="inputDescFontScale">提示文案字号</label>
+            <span class="param-val" id="valDescFontScale">15px</span>
+          </div>
+          <input type="range" id="inputDescFontScale" min="12" max="22" step="1" value="15">
+        </div>
+      </section>
+
+      <!-- 计时逻辑参数 -->
+      <section class="panel-card">
+        <h2 class="card-title">业务计时规则</h2>
+
+        <!-- 亮屏触发周期切换 -->
+        <div class="control-row">
+          <span class="control-text-label">亮屏触发周期</span>
+          <div class="segmented-control">
+            <button class="seg-btn active" data-cycle="10" id="segCycle10" type="button">10 秒 (快速测试)</button>
+            <button class="seg-btn" data-cycle="1200" id="segCycle1200" type="button">20 分钟 (正式标准)</button>
+          </div>
+        </div>
+
+        <!-- 远眺倒计时时长调节 -->
+        <div class="control-row">
+          <div class="control-label-row">
+            <label for="inputRestDuration">远眺倒计时时长 (Rest Duration)</label>
+            <span class="param-val" id="valRestDuration">20秒</span>
+          </div>
+          <input type="range" id="inputRestDuration" min="5" max="60" step="1" value="20">
+        </div>
+      </section>
+
+      <!-- 静默特性声明 -->
+      <footer class="panel-footer">
+        <div class="feature-tag">✔ 纯视觉引导</div>
+        <div class="feature-tag">✔ 严禁外放音频</div>
+        <div class="feature-tag">✔ 严格无震动</div>
+        <div class="feature-tag">✔ 自动淡出循环</div>
+      </footer>
+    </aside>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

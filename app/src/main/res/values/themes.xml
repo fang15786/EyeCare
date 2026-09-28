@@ -1,0 +1,8 @@
+<resources>
+    <style name="Theme.EyeCare" parent="android:Theme.Material.NoActionBar">
+        <item name="android:colorPrimary">@color/primary_accent</item>
+        <item name="android:windowBackground">@color/bg_dark</item>
+        <item name="android:statusBarColor">@color/bg_dark</item>
+        <item name="android:navigationBarColor">@color/bg_dark</item>
+    </style>
+</resources>

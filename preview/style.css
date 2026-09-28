@@ -1,0 +1,746 @@
+/**
+ * EyeCare 20-20-20 护眼助手 Web 仿真预览端样式
+ * 采用现代 CSS 变量、深色高质感 Glassmorphism 磨砂玻璃风格以及精致手机物理外壳
+ */
+
+/* ==========================================================================
+   1. 设计系统全局变量与基础重置
+   ========================================================================== */
+:root {
+  /* 背景与表面色彩 */
+  --bg-workspace: #0b0f17;
+  --bg-panel: rgba(20, 26, 38, 0.75);
+  --bg-card: rgba(28, 36, 52, 0.65);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-focus: rgba(78, 205, 196, 0.5);
+
+  /* 主题色系：护眼青绿与舒缓蓝紫 */
+  --primary-accent: #38ef7d;
+  --primary-glow: rgba(56, 239, 125, 0.35);
+  --secondary-accent: #11998e;
+  --text-main: #f3f6fa;
+  --text-secondary: #9aa8bc;
+  --text-muted: #5e6d82;
+
+  /* 可动态配置的遮罩样式变量（由 JS 实时修改） */
+  --overlay-opacity: 0.82;
+  --overlay-blur: 12px;
+  --timer-font-size: 64px;
+  --desc-font-size: 15px;
+
+  /* 字体族 */
+  --font-family: 'Plus Jakarta Sans', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --transition-smooth: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--bg-workspace);
+  background-image: 
+    radial-gradient(circle at 15% 20%, rgba(17, 153, 142, 0.12) 0%, transparent 40%),
+    radial-gradient(circle at 85% 75%, rgba(56, 239, 125, 0.08) 0%, transparent 45%);
+  color: var(--text-main);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-x: hidden;
+  padding: 32px 20px;
+}
+
+/* ==========================================================================
+   2. 主工作区布局 (双栏响应式)
+   ========================================================================== */
+.workspace-layout {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 56px;
+  max-width: 1320px;
+  width: 100%;
+}
+
+@media (max-width: 1080px) {
+  .workspace-layout {
+    flex-direction: column;
+    gap: 40px;
+  }
+}
+
+/* ==========================================================================
+   3. 手机模型外壳 (Phone Viewport)
+   ========================================================================== */
+.phone-viewport-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  perspective: 1200px;
+}
+
+.phone-device {
+  position: relative;
+  width: 375px;
+  height: 760px;
+  background: #1e2430;
+  border-radius: 54px;
+  padding: 12px;
+  /* 仿真多层金属倒角外壳阴影与反光 */
+  box-shadow: 
+    0 0 0 2px rgba(255, 255, 255, 0.1),
+    0 0 0 6px #12161f,
+    0 24px 60px rgba(0, 0, 0, 0.75),
+    0 10px 25px rgba(0, 0, 0, 0.5),
+    inset 0 0 4px rgba(255, 255, 255, 0.2);
+  user-select: none;
+}
+
+/* 侧边物理按键 */
+.phone-button {
+  position: absolute;
+  width: 4px;
+  background: #2a3344;
+  border-radius: 2px;
+}
+.phone-button.volume-up {
+  left: -7px;
+  top: 150px;
+  height: 52px;
+}
+.phone-button.volume-down {
+  left: -7px;
+  top: 216px;
+  height: 52px;
+}
+.phone-button.power-button {
+  right: -7px;
+  top: 175px;
+  height: 72px;
+}
+
+/* 手机屏幕视口 */
+.phone-screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #0d121c;
+  border-radius: 44px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 顶部状态栏 */
+.status-bar {
+  height: 48px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 20;
+}
+
+/* 灵动岛 */
+.dynamic-island {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+  width: 110px;
+  height: 28px;
+  background: #000;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 12px;
+}
+.camera-lens {
+  width: 10px;
+  height: 10px;
+  background: #0c182b;
+  border-radius: 50%;
+  box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.3);
+}
+
+.status-icons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.status-icons .icon {
+  width: 15px;
+  height: 15px;
+  opacity: 0.9;
+}
+
+.battery-icon {
+  width: 22px;
+  height: 11px;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  border-radius: 3px;
+  padding: 1px;
+  position: relative;
+}
+.battery-icon::after {
+  content: '';
+  position: absolute;
+  right: -3.5px;
+  top: 2px;
+  width: 2px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 0 1px 1px 0;
+}
+.battery-level {
+  width: 78%;
+  height: 100%;
+  background: #38ef7d;
+  border-radius: 1px;
+}
+
+/* 模拟手机主界面内容 */
+.simulated-app-content {
+  flex: 1;
+  padding: 12px 18px 24px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.simulated-app-content::-webkit-scrollbar {
+  display: none;
+}
+
+.app-hero-card {
+  background: linear-gradient(135deg, rgba(28, 40, 62, 0.9), rgba(18, 25, 38, 0.95));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+.app-tag {
+  display: inline-block;
+  background: rgba(56, 239, 125, 0.15);
+  color: #38ef7d;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+.app-title {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #fff;
+  margin-bottom: 6px;
+}
+.app-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.article-body {
+  font-size: 13px;
+  line-height: 1.65;
+  color: #c0ccdc;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.infographic-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(16, 22, 33, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  padding: 12px 10px;
+  margin: 6px 0;
+}
+.info-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.metric-number {
+  font-size: 20px;
+  font-weight: 700;
+  color: #38ef7d;
+}
+.metric-unit {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+.metric-desc {
+  font-size: 9px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.info-arrow {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.simulated-bottom-nav {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-around;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.simulated-bottom-nav .nav-item.active {
+  color: #38ef7d;
+  font-weight: 600;
+}
+
+/* 底部 Home Indicator */
+.phone-home-indicator {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 130px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 4px;
+  z-index: 50;
+}
+
+/* ==========================================================================
+   4. 熄屏遮罩层 (模拟黑屏锁屏)
+   ========================================================================== */
+.screen-off-mask {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.screen-off-mask.active {
+  opacity: 1;
+  pointer-events: all;
+}
+.screen-off-hint {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.5px;
+}
+
+/* ==========================================================================
+   5. 核心：全屏半透明护眼遮罩与倒计时动效
+   ========================================================================== */
+.eye-care-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(1.03);
+  transition: opacity 0.45s cubic-bezier(0.2, 0.9, 0.3, 1), transform 0.45s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+/* 遮罩激活状态 */
+.eye-care-overlay.visible {
+  opacity: 1;
+  pointer-events: all;
+  transform: scale(1);
+}
+
+/* 遮罩背景：半透明渐变 + 高斯毛玻璃 */
+.overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, 
+    rgba(6, 12, 22, var(--overlay-opacity)) 0%, 
+    rgba(10, 18, 30, var(--overlay-opacity)) 100%);
+  backdrop-filter: blur(var(--overlay-blur));
+  -webkit-backdrop-filter: blur(var(--overlay-blur));
+  transition: backdrop-filter 0.3s ease, background 0.3s ease;
+}
+
+.overlay-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 24px;
+  width: 100%;
+}
+
+/* 环形倒计时组件 */
+.timer-ring-wrapper {
+  position: relative;
+  width: 190px;
+  height: 190px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.timer-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg); /* 从顶部 12 点钟位置开始倒计时 */
+}
+
+.ring-bg {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 6;
+}
+
+.ring-progress {
+  fill: none;
+  stroke: url(#timerGradient);
+  stroke: #38ef7d;
+  stroke-width: 6;
+  stroke-linecap: round;
+  /* 周长 = 2 * PI * 88 ≈ 552.92 */
+  stroke-dasharray: 552.92;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 1s linear;
+  filter: drop-shadow(0 0 10px var(--primary-glow));
+}
+
+.timer-center-text {
+  position: absolute;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 3px;
+}
+
+.countdown-seconds {
+  font-size: var(--timer-font-size);
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -1.5px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.6);
+  transition: font-size 0.2s ease;
+}
+
+.countdown-unit {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--primary-accent);
+}
+
+/* 遮罩文案指导 */
+.overlay-guidance {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.guidance-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.guidance-desc {
+  font-size: var(--desc-font-size);
+  color: #d1dcec;
+  line-height: 1.5;
+  max-width: 250px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  transition: font-size 0.2s ease;
+}
+
+.guidance-subtip {
+  font-size: 11px;
+  color: #72849c;
+  margin-top: 4px;
+}
+
+/* 底部柔和光感呼吸条 */
+.ambient-pulse-bar {
+  width: 48px;
+  height: 3px;
+  background: var(--primary-accent);
+  border-radius: 2px;
+  margin-top: 24px;
+  box-shadow: 0 0 12px var(--primary-glow);
+  animation: pulse-glow 2.2s infinite ease-in-out;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; transform: scaleX(0.85); }
+  50% { opacity: 0.95; transform: scaleX(1.15); }
+}
+
+/* ==========================================================================
+   6. 控制面板 (Control Panel)
+   ========================================================================== */
+.control-panel-container {
+  width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+@media (max-width: 480px) {
+  .control-panel-container {
+    width: 100%;
+  }
+}
+
+.panel-header {
+  margin-bottom: 2px;
+}
+.panel-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--primary-accent);
+  background: rgba(56, 239, 125, 0.12);
+  border: 1px solid rgba(56, 239, 125, 0.25);
+  padding: 4px 10px;
+  border-radius: 20px;
+  margin-bottom: 8px;
+}
+.panel-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.5px;
+  margin-bottom: 4px;
+}
+.panel-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* 面板卡片 */
+.panel-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  padding: 20px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #cbd7e6;
+  letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-title::before {
+  content: '';
+  width: 4px;
+  height: 14px;
+  background: var(--primary-accent);
+  border-radius: 2px;
+}
+
+/* 状态看板 Grid */
+.status-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.status-item {
+  background: rgba(13, 18, 28, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.status-item .label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.status-item .value {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e2eaf4;
+}
+.status-item .value.accent {
+  color: var(--primary-accent);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+}
+
+/* 按钮组 */
+.action-btn-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+.btn-primary {
+  background: linear-gradient(135deg, #11998e, #38ef7d);
+  color: #061814;
+  box-shadow: 0 4px 18px var(--primary-glow);
+}
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 22px rgba(56, 239, 125, 0.45);
+}
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  color: #dbe4ef;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+.btn:active {
+  transform: translateY(0);
+}
+
+/* 控制表单项 */
+.control-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.control-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.param-val {
+  font-weight: 600;
+  color: var(--primary-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Range 滑块精美样式 */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #38ef7d;
+  box-shadow: 0 0 8px var(--primary-glow);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+/* 分段切换按钮 (Segmented Control) */
+.segmented-control {
+  display: flex;
+  background: rgba(10, 15, 24, 0.7);
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  gap: 4px;
+}
+.control-text-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.seg-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 7px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+.seg-btn.active {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* 底部标签 */
+.panel-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+.feature-tag {
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 4px 10px;
+  border-radius: 8px;
+}

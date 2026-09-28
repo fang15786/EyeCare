@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 全屏半透明深色护眼悬浮遮罩 (纯视觉、零外放、无震动) -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/overlayRootLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#D9080E18"
+    android:clickable="true"
+    android:focusable="false">
+
+    <!-- 居中远眺引导内容区 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingStart="32dp"
+        android:paddingEnd="32dp">
+
+        <!-- 倒计时圆环卡片 -->
+        <FrameLayout
+            android:layout_width="180dp"
+            android:layout_height="180dp"
+            android:background="@drawable/bg_overlay_circle"
+            android:layout_marginBottom="24dp">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:orientation="horizontal"
+                android:gravity="bottom">
+
+                <TextView
+                    android:id="@+id/tvCountdownSeconds"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="20"
+                    android:textColor="#FFFFFF"
+                    android:textSize="64sp"
+                    android:textStyle="bold"
+                    android:includeFontPadding="false" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=" 秒"
+                    android:textColor="#38EF7D"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginBottom="12dp" />
+            </LinearLayout>
+        </FrameLayout>
+
+        <!-- 提示主标题 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="远眺放松时刻"
+            android:textColor="#FFFFFF"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <!-- 远眺科学指导文案 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="请将视线移开屏幕，眺望 6 米（20英尺）外的景物"
+            android:textColor="#D5E0EE"
+            android:textSize="15sp"
+            android:gravity="center"
+            android:lineSpacingExtra="4dp"
+            android:layout_marginBottom="12dp" />
+
+        <!-- 自动淡出提示文案 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="无需任何操作，倒计时归零后遮罩将自动关闭"
+            android:textColor="#7A8CA3"
+            android:textSize="12sp" />
+
+    </LinearLayout>
+
+</FrameLayout>

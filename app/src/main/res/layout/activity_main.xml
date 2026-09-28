@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:gravity="center_horizontal"
+    android:background="#0F141C">
+
+    <!-- 应用标题 -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/app_name"
+        android:textColor="#FFFFFF"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:layout_marginTop="32dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="20-20-20 纯视觉护眼助手 (无声无震动)"
+        android:textColor="#8896AA"
+        android:textSize="13sp"
+        android:layout_marginTop="6dp" />
+
+    <!-- 状态监控展示卡片 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#1B2230"
+        android:padding="18dp"
+        android:layout_marginTop="28dp"
+        android:layout_marginBottom="24dp">
+
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#D5E0EE"
+            android:textSize="14sp"
+            android:lineSpacingExtra="6dp"
+            android:text="正在初始化状态..." />
+    </LinearLayout>
+
+    <!-- 主控操作按钮 -->
+    <Button
+        android:id="@+id/btnToggleService"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:text="开启护眼守护"
+        android:textColor="#051410"
+        android:backgroundTint="#38EF7D"
+        android:textStyle="bold"
+        android:textSize="15sp"
+        android:layout_marginBottom="12dp" />
+
+    <Button
+        android:id="@+id/btnToggleTestMode"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="切换为 10 秒测试模式"
+        android:textColor="#E0E6F0"
+        android:backgroundTint="#263144"
+        android:textSize="14sp"
+        android:layout_marginBottom="12dp" />
+
+    <Button
+        android:id="@+id/btnTriggerTest"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="立即弹出遮罩测试 (20秒)"
+        android:textColor="#E0E6F0"
+        android:backgroundTint="#263144"
+        android:textSize="14sp" />
+
+</LinearLayout>

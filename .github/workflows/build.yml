@@ -25,25 +25,14 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: 设置 Android SDK 缓存
-        uses: actions/cache@v3
+      - name: 设置并锁定 Gradle 8.2 环境
+        uses: gradle/actions/setup-gradle@v3
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-
-      - name: 初始化 Gradle Wrapper (确保版本匹配 AGP 8.2)
-        run: |
-          if [ ! -f "./gradlew" ]; then
-            gradle wrapper --gradle-version 8.2
-          fi
-          chmod +x ./gradlew
+          gradle-version: '8.2'
 
       - name: 执行 Gradle 构建生成 Debug APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: gradle assembleDebug --stacktrace
+
 
       - name: 上传构建工件 (Actions Artifacts 备份)
         uses: actions/upload-artifact@v4

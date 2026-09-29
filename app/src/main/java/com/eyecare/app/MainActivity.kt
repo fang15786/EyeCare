@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -186,29 +187,36 @@ class MainActivity : Activity() {
 
     /**
      * 更新预设时长按钮的选中高亮样式
+     * 选中状态：翠绿背景 + 发光浅白绿边框 + 墨绿高对比度文字 + 加粗 + 动态勾选符 (✓)
+     * 未选中状态：深色沉稳卡片 + 细暗边框 + 次级浅灰文字 + 常规字重
      */
     private fun updatePresetButtonsVisual() {
-        val presetMap = mapOf(
-            10 to btnCycle10s,
-            10 * 60 to btnCycle10m,
-            15 * 60 to btnCycle15m,
-            20 * 60 to btnCycle20m,
-            30 * 60 to btnCycle30m,
-            45 * 60 to btnCycle45m
+        val presetList = listOf(
+            Triple(10, btnCycle10s, "10秒(测试)"),
+            Triple(10 * 60, btnCycle10m, "10分钟"),
+            Triple(15 * 60, btnCycle15m, "15分钟"),
+            Triple(20 * 60, btnCycle20m, "20分(推荐)"),
+            Triple(30 * 60, btnCycle30m, "30分钟"),
+            Triple(45 * 60, btnCycle45m, "45分钟")
         )
 
-        val activeColor = Color.parseColor("#38EF7D")
-        val inactiveColor = Color.parseColor("#263144")
-        val activeTextColor = Color.parseColor("#051410")
-        val inactiveTextColor = Color.parseColor("#D5E0EE")
+        val activeTextColor = Color.parseColor("#002914") // 极致高对比墨绿色
+        val inactiveTextColor = Color.parseColor("#8E9CAE") // 低饱和暗灰蓝色
 
-        presetMap.forEach { (seconds, button) ->
+        val activeBg = getDrawable(R.drawable.bg_btn_preset_active)
+        val inactiveBg = getDrawable(R.drawable.bg_btn_preset_inactive)
+
+        presetList.forEach { (seconds, button, originalLabel) ->
             if (seconds == selectedCycleSeconds) {
-                button.setBackgroundColor(activeColor)
+                button.background = activeBg?.constantState?.newDrawable()?.mutate() ?: activeBg
                 button.setTextColor(activeTextColor)
+                button.typeface = Typeface.DEFAULT_BOLD
+                button.text = "✓ $originalLabel"
             } else {
-                button.setBackgroundColor(inactiveColor)
+                button.background = inactiveBg?.constantState?.newDrawable()?.mutate() ?: inactiveBg
                 button.setTextColor(inactiveTextColor)
+                button.typeface = Typeface.DEFAULT
+                button.text = originalLabel
             }
         }
     }

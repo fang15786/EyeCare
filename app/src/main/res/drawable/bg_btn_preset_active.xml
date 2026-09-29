@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 运行时间预设按钮 - 选中激活高亮背景 (高饱和翠绿 + 发光亮白浅绿双层边框 + 10dp圆角) -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#00E676" />
+    <corners android:radius="10dp" />
+    <stroke
+        android:width="2dp"
+        android:color="#D1FAE5" />
+</shape>

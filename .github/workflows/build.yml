@@ -30,15 +30,15 @@ jobs:
         with:
           gradle-version: '8.2'
 
-      - name: 执行 Gradle 构建生成 Debug APK
-        run: gradle assembleDebug --stacktrace
+      - name: 执行 Gradle 构建生成 Release APK
+        run: gradle assembleRelease --stacktrace
 
 
       - name: 上传构建工件 (Actions Artifacts 备份)
         uses: actions/upload-artifact@v4
         with:
-          name: EyeCare-Debug-APK
-          path: app/build/outputs/apk/debug/*.apk
+          name: EyeCare-Release-APK
+          path: app/build/outputs/apk/release/*.apk
           retention-days: 14
 
       - name: 自动发布到 GitHub Release Assets
@@ -49,11 +49,12 @@ jobs:
           name: "EyeCare 自动构建 v1.0.${{ github.run_number }}"
           body: |
             ## EyeCare 护眼助手
+            - **永久统一签名**：已绑定固定数字证书，今后所有版本更新均可直接点击覆盖安装，绝不报签名冲突。
             - **纯视觉静默运行**：无声音、无任何震动。
             - **智能遮罩防疲劳**：亮屏达到预设时长自动弹出半透明深色全屏悬浮遮罩，倒计时 20 秒后自动平滑淡出关闭并循环。
             - **短视频自动暂停**：看抖音等视频时弹出遮罩自动暂停，遮罩结束后自动恢复播放。
-            - **安装说明**：请直接在下方 **Assets** 附件列表中点击下载 `.apk` 安装包。
-          files: app/build/outputs/apk/debug/*.apk
+            - **安装说明**：请直接在下方 **Assets** 附件列表中点击下载 `.apk` 安装包。首次安装本固定签名版本前，请在手机上彻底卸载一次旧版本。
+          files: app/build/outputs/apk/release/*.apk
           draft: false
           prerelease: false
         env:

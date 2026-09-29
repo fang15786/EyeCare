@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">EyeCare 20-20-20</string>
+    <string name="app_name">EyeCare</string>
     <string name="channel_name">护眼守护服务</string>
     <string name="channel_description">记录亮屏时间并在 20 分钟后提示远眺</string>
 </resources>

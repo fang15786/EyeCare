@@ -46,11 +46,12 @@ jobs:
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
         with:
           tag_name: v1.0.${{ github.run_number }}
-          name: "EyeCare 20-20-20 自动构建 v1.0.${{ github.run_number }}"
+          name: "EyeCare 自动构建 v1.0.${{ github.run_number }}"
           body: |
-            ## EyeCare 20-20-20 护眼助手
+            ## EyeCare 护眼助手
             - **纯视觉静默运行**：无声音、无任何震动。
-            - **20-20-20 规则**：每 20 分钟亮屏弹出半透明深色全屏悬浮遮罩，倒计时 20 秒后自动平滑淡出关闭并循环。
+            - **智能遮罩防疲劳**：亮屏达到预设时长自动弹出半透明深色全屏悬浮遮罩，倒计时 20 秒后自动平滑淡出关闭并循环。
+            - **短视频自动暂停**：看抖音等视频时弹出遮罩自动暂停，遮罩结束后自动恢复播放。
             - **安装说明**：请直接在下方 **Assets** 附件列表中点击下载 `.apk` 安装包。
           files: app/build/outputs/apk/debug/*.apk
           draft: false

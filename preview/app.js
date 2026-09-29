@@ -3,8 +3,8 @@
  *
  * 核心机制说明：
  * 1. 仅累计亮屏时间：屏幕常亮时秒数递增，锁屏/黑屏时暂停计时；
- * 2. 满周期（测试 10s 或标准 20min）自动触发半透明全屏悬浮遮罩；
- * 3. 20 秒远眺倒计时归零后，遮罩自动平滑淡出，计时自动清零并开启下一轮；
+ * 2. 满周期（支持自定义运行时间：10秒快速测试、10~45分钟预设或自定义输入）自动触发半透明全屏悬浮遮罩；
+ * 3. 视频播放暂停联动：在刷抖音等视频时，遮罩弹出自动打断并暂停播放；20秒远眺倒计时结束后平滑淡出并自动恢复播放；
  * 4. 纯视觉静音设计：不调用任何 Web Audio API，不调用 navigator.vibrate。
  */
 
@@ -19,7 +19,7 @@ const appState = {
   isScreenOn: true,
   // 当前周期内累计亮屏有效秒数
   screenOnSeconds: 0,
-  // 触发遮罩的工作时长阈值（默认 10 秒测试，可选 1200 秒即 20 分钟）
+  // 触发遮罩的工作时长阈值（默认 10 秒测试，可选分钟或秒数）
   workCycleDuration: 10,
   // 远眺休息倒计时时长（默认 20 秒）
   restDuration: 20,
@@ -28,7 +28,11 @@ const appState = {
   // 遮罩倒计时当前剩余秒数
   remainingSeconds: 20,
   // 倒计时句柄
-  overlayTimerId: null
+  overlayTimerId: null,
+  // 当前手机模拟场景：'video' (抖音短视频) 或 'article' (深度阅读)
+  currentScene: 'video',
+  // 是否开启遮罩弹出时自动暂停音视频
+  pauseMediaEnabled: true
 };
 
 // ==========================================================================
@@ -44,12 +48,22 @@ const elements = {
   countdownSeconds: document.getElementById('countdownSeconds'),
   guidanceTitle: document.getElementById('guidanceTitle'),
   guidanceDesc: document.getElementById('guidanceDesc'),
+  guidanceMediaSubtip: document.getElementById('guidanceMediaSubtip'),
+
+  // 场景与模拟应用容器
+  tabVideo: document.getElementById('tabVideo'),
+  tabArticle: document.getElementById('tabArticle'),
+  simulatedVideoContent: document.getElementById('simulatedVideoContent'),
+  simulatedAppContent: document.getElementById('simulatedAppContent'),
+  videoStatusText: document.getElementById('videoStatusText'),
 
   // 状态看板
   dispScreenState: document.getElementById('dispScreenState'),
   dispScreenTime: document.getElementById('dispScreenTime'),
   dispTargetTime: document.getElementById('dispTargetTime'),
+  dispMediaState: document.getElementById('dispMediaState'),
   dispOverlayState: document.getElementById('dispOverlayState'),
+  dispConfiguredCycle: document.getElementById('dispConfiguredCycle'),
 
   // 动作按钮
   btnToggleScreen: document.getElementById('btnToggleScreen'),
@@ -57,21 +71,25 @@ const elements = {
   btnResetTimer: document.getElementById('btnResetTimer'),
   btnTriggerNow: document.getElementById('btnTriggerNow'),
 
+  // 运行时间控制
+  presetChips: document.querySelectorAll('.preset-chips-container .chip-btn'),
+  inputCustomValue: document.getElementById('inputCustomValue'),
+  selectCustomUnit: document.getElementById('selectCustomUnit'),
+  btnApplyCustomCycle: document.getElementById('btnApplyCustomCycle'),
+  inputRestDuration: document.getElementById('inputRestDuration'),
+  valRestDuration: document.getElementById('valRestDuration'),
+
+  // 音视频暂停联动
+  checkPauseMedia: document.getElementById('checkPauseMedia'),
+  btnToggleScene: document.getElementById('btnToggleScene'),
+
   // 视觉参数调节输入
   inputOpacity: document.getElementById('inputOpacity'),
   valOpacity: document.getElementById('valOpacity'),
   inputBlur: document.getElementById('inputBlur'),
   valBlur: document.getElementById('valBlur'),
   inputFontScale: document.getElementById('inputFontScale'),
-  valFontScale: document.getElementById('valFontScale'),
-  inputDescFontScale: document.getElementById('inputDescFontScale'),
-  valDescFontScale: document.getElementById('valDescFontScale'),
-
-  // 规则参数调节输入
-  segCycle10: document.getElementById('segCycle10'),
-  segCycle1200: document.getElementById('segCycle1200'),
-  inputRestDuration: document.getElementById('inputRestDuration'),
-  valRestDuration: document.getElementById('valRestDuration')
+  valFontScale: document.getElementById('valFontScale')
 };
 
 // ==========================================================================
@@ -90,6 +108,23 @@ function formatTime(totalSeconds) {
 }
 
 /**
+ * 格式化周期文本显示（如 "10 秒 (测试)" 或 "20 分钟"）
+ * @param {number} seconds 
+ * @returns {string}
+ */
+function formatCycleText(seconds) {
+  if (seconds < 60) {
+    return `${seconds} 秒 (测试)`;
+  }
+  const mins = Math.floor(seconds / 60);
+  const remainSecs = seconds % 60;
+  if (remainSecs > 0) {
+    return `${mins}分${remainSecs}秒`;
+  }
+  return `${mins} 分钟`;
+}
+
+/**
  * 实时同步顶部状态栏的时钟显示（HH:mm）
  */
 function updateClockTime() {
@@ -102,7 +137,61 @@ function updateClockTime() {
 }
 
 // ==========================================================================
-// 4. 遮罩层业务控制器 (纯视觉提示、倒计时、平滑淡出)
+// 4. 模拟短视频与场景联动逻辑
+// ==========================================================================
+
+/**
+ * 切换模拟手机的运行场景（抖音短视频 vs 深度阅读）
+ * @param {'video'|'article'} scene 
+ */
+function switchScene(scene) {
+  appState.currentScene = scene;
+
+  if (scene === 'video') {
+    elements.simulatedVideoContent.classList.remove('hidden');
+    elements.simulatedAppContent.classList.add('hidden');
+    elements.tabVideo.classList.add('active');
+    elements.tabArticle.classList.remove('active');
+    elements.btnToggleScene.textContent = '切换为阅读模式';
+    updateMediaPlaybackVisual();
+  } else {
+    elements.simulatedVideoContent.classList.add('hidden');
+    elements.simulatedAppContent.classList.remove('hidden');
+    elements.tabArticle.classList.add('active');
+    elements.tabVideo.classList.remove('active');
+    elements.btnToggleScene.textContent = '切换为抖音短视频';
+    elements.dispMediaState.textContent = '未播放 (阅读中)';
+    elements.dispMediaState.style.color = '#8896aa';
+  }
+}
+
+/**
+ * 更新短视频播放/暂停状态界面的视觉元素
+ */
+function updateMediaPlaybackVisual() {
+  if (appState.currentScene !== 'video') return;
+
+  if (appState.isOverlayShowing && appState.pauseMediaEnabled) {
+    // 遮罩显示中且开启了自动暂停：暂停视频与旋转唱片
+    elements.simulatedVideoContent.classList.add('paused');
+    elements.videoStatusText.textContent = '已自动暂停 (远眺中)';
+    elements.dispMediaState.textContent = '已自动暂停 ⏸';
+    elements.dispMediaState.style.color = '#ff9f43';
+    elements.guidanceMediaSubtip.textContent = '视频已自动暂停 · 倒计时归零后将自动恢复播放';
+  } else {
+    // 正常播放状态
+    elements.simulatedVideoContent.classList.remove('paused');
+    elements.videoStatusText.textContent = '短视频正在播放中';
+    elements.dispMediaState.textContent = '播放中 (抖音) 🎵';
+    elements.dispMediaState.style.color = '#38ef7d';
+    elements.guidanceMediaSubtip.textContent = appState.pauseMediaEnabled 
+      ? '倒计时归零后将自动淡出关闭' 
+      : '未开启媒体打断 · 视频持续播放中';
+  }
+}
+
+// ==========================================================================
+// 5. 遮罩层业务控制器 (纯视觉提示、倒计时、平滑淡出、音视频暂停恢复)
 // ==========================================================================
 
 /**
@@ -118,7 +207,10 @@ function showEyeCareOverlay() {
   elements.dispOverlayState.textContent = '护眼远眺提醒中';
   elements.dispOverlayState.style.color = '#38ef7d';
 
-  // 显示遮罩 DOM（通过 CSS transition 产生平滑渐变缩放入场）
+  // 触发视频自动暂停
+  updateMediaPlaybackVisual();
+
+  // 显示遮罩 DOM（通过 CSS transition 产生平滑渐变入场）
   elements.eyeCareOverlay.classList.add('visible');
   elements.eyeCareOverlay.setAttribute('aria-hidden', 'false');
 
@@ -142,7 +234,7 @@ function showEyeCareOverlay() {
       clearInterval(appState.overlayTimerId);
       appState.overlayTimerId = null;
 
-      // 延迟 400ms 后平滑淡出关闭遮罩并重置下一轮
+      // 延迟 400ms 后平滑淡出关闭遮罩并恢复视频播放
       setTimeout(() => {
         hideEyeCareOverlay();
       }, 400);
@@ -154,12 +246,15 @@ function showEyeCareOverlay() {
 }
 
 /**
- * 平滑淡出并隐藏护眼遮罩，静默开启下一轮 20 分钟亮屏循环
+ * 平滑淡出并隐藏护眼遮罩，恢复音视频播放，静默开启下一轮亮屏循环
  */
 function hideEyeCareOverlay() {
   elements.eyeCareOverlay.classList.remove('visible');
   elements.eyeCareOverlay.setAttribute('aria-hidden', 'true');
   appState.isOverlayShowing = false;
+
+  // 恢复短视频继续播放
+  updateMediaPlaybackVisual();
 
   // 重置累计亮屏秒数，开启下一轮周期
   appState.screenOnSeconds = 0;
@@ -177,14 +272,13 @@ function hideEyeCareOverlay() {
  */
 function updateCircularProgress(remaining, total) {
   if (!elements.ringProgress) return;
-  // 环形从完整逐渐缩减
   const progressRatio = remaining / total;
   const offset = SVG_CIRCUMFERENCE * (1 - progressRatio);
   elements.ringProgress.style.strokeDashoffset = offset;
 }
 
 // ==========================================================================
-// 5. 亮屏主计时器循环 (仅在亮屏且非提醒状态下累加)
+// 6. 亮屏主计时器循环 (仅在亮屏且非提醒状态下累加)
 // ==========================================================================
 
 /**
@@ -215,11 +309,13 @@ function updateDashboard() {
     elements.dispTargetTime.textContent = '正在远眺中...';
   } else {
     const remainToTrigger = Math.max(0, appState.workCycleDuration - appState.screenOnSeconds);
-    const modeLabel = appState.workCycleDuration === 10 ? '(测试)' : '(标准)';
-    elements.dispTargetTime.textContent = `${remainToTrigger} 秒后 ${modeLabel}`;
+    elements.dispTargetTime.textContent = `${remainToTrigger} 秒后`;
   }
 
-  // 3. 屏幕状态
+  // 3. 设定周期
+  elements.dispConfiguredCycle.textContent = formatCycleText(appState.workCycleDuration);
+
+  // 4. 屏幕状态
   if (appState.isScreenOn) {
     elements.dispScreenState.textContent = '亮屏中 (计时运行)';
     elements.dispScreenState.style.color = '#38ef7d';
@@ -230,7 +326,7 @@ function updateDashboard() {
 }
 
 // ==========================================================================
-// 6. 控制面板交互与动态参数绑定
+// 7. 控制面板交互与动态参数绑定
 // ==========================================================================
 
 /**
@@ -242,9 +338,15 @@ function toggleScreenPower() {
   if (appState.isScreenOn) {
     elements.screenOffMask.classList.remove('active');
     elements.btnToggleScreenText.textContent = '模拟熄屏/锁屏';
+    updateMediaPlaybackVisual();
   } else {
     elements.screenOffMask.classList.add('active');
     elements.btnToggleScreenText.textContent = '模拟点亮屏幕';
+    // 熄屏时视频也自动暂停
+    if (appState.currentScene === 'video') {
+      elements.simulatedVideoContent.classList.add('paused');
+      elements.dispMediaState.textContent = '锁屏暂停 ⏸';
+    }
   }
 
   updateDashboard();
@@ -263,28 +365,70 @@ function resetScreenTimer() {
 }
 
 /**
- * 切换亮屏周期模式（10秒快速测试 vs 1200秒标准20分钟）
- * @param {number} cycleDuration 目标秒数
+ * 切换选中的运行周期时长
+ * @param {number} seconds 
  */
-function setCycleMode(cycleDuration) {
-  appState.workCycleDuration = cycleDuration;
+function setWorkCycle(seconds) {
+  appState.workCycleDuration = seconds;
   appState.screenOnSeconds = 0;
 
-  if (cycleDuration === 10) {
-    elements.segCycle10.classList.add('active');
-    elements.segCycle1200.classList.remove('active');
-  } else {
-    elements.segCycle1200.classList.add('active');
-    elements.segCycle10.classList.remove('active');
-  }
+  // 更新预设胶囊选中高亮
+  elements.presetChips.forEach(chip => {
+    const cycle = parseInt(chip.getAttribute('data-cycle'), 10);
+    if (cycle === seconds) {
+      chip.classList.add('active');
+    } else {
+      chip.classList.remove('active');
+    }
+  });
 
   updateDashboard();
 }
 
 /**
- * 绑定所有滑块输入监听，实时修改 CSS 变量或业务参数
+ * 绑定所有滑块输入与按钮监听
  */
 function bindControlInputs() {
+  // 场景切换选项卡
+  elements.tabVideo.addEventListener('click', () => switchScene('video'));
+  elements.tabArticle.addEventListener('click', () => switchScene('article'));
+
+  // 场景切换按钮（控制面板）
+  elements.btnToggleScene.addEventListener('click', () => {
+    switchScene(appState.currentScene === 'video' ? 'article' : 'video');
+  });
+
+  // 音视频暂停联动开关
+  elements.checkPauseMedia.addEventListener('change', (e) => {
+    appState.pauseMediaEnabled = e.target.checked;
+    updateMediaPlaybackVisual();
+  });
+
+  // 预设时长胶囊按钮点击
+  elements.presetChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      const cycle = parseInt(chip.getAttribute('data-cycle'), 10);
+      setWorkCycle(cycle);
+    });
+  });
+
+  // 自定义时长应用
+  elements.btnApplyCustomCycle.addEventListener('click', () => {
+    const val = parseInt(elements.inputCustomValue.value, 10);
+    const multiplier = parseInt(elements.selectCustomUnit.value, 10);
+    if (!isNaN(val) && val > 0) {
+      const totalSeconds = val * multiplier;
+      setWorkCycle(totalSeconds);
+    }
+  });
+
+  // 远眺倒计时时长调节
+  elements.inputRestDuration.addEventListener('input', (e) => {
+    const val = parseInt(e.target.value, 10);
+    elements.valRestDuration.textContent = `${val}秒`;
+    appState.restDuration = val;
+  });
+
   // 遮罩不透明度
   elements.inputOpacity.addEventListener('input', (e) => {
     const val = parseFloat(e.target.value);
@@ -306,24 +450,6 @@ function bindControlInputs() {
     document.documentElement.style.setProperty('--timer-font-size', `${val}px`);
   });
 
-  // 提示文案字号
-  elements.inputDescFontScale.addEventListener('input', (e) => {
-    const val = parseInt(e.target.value, 10);
-    elements.valDescFontScale.textContent = `${val}px`;
-    document.documentElement.style.setProperty('--desc-font-size', `${val}px`);
-  });
-
-  // 远眺倒计时时长调节
-  elements.inputRestDuration.addEventListener('input', (e) => {
-    const val = parseInt(e.target.value, 10);
-    elements.valRestDuration.textContent = `${val}秒`;
-    appState.restDuration = val;
-  });
-
-  // 周期分段切换
-  elements.segCycle10.addEventListener('click', () => setCycleMode(10));
-  elements.segCycle1200.addEventListener('click', () => setCycleMode(1200));
-
   // 模拟熄屏 / 点亮按钮
   elements.btnToggleScreen.addEventListener('click', toggleScreenPower);
 
@@ -340,7 +466,7 @@ function bindControlInputs() {
 }
 
 // ==========================================================================
-// 7. 应用启动初始化
+// 8. 应用启动初始化
 // ==========================================================================
 function initApp() {
   // 初始化 SVG 环形周长属性
@@ -359,9 +485,13 @@ function initApp() {
   // 启动主屏幕计时器心跳 (1秒/次)
   setInterval(tickScreenTimer, 1000);
 
+  // 初始化场景和媒体状态
+  switchScene('video');
+
   // 初始化面板看板
   updateDashboard();
 }
 
 // 页面加载完成后启动
 document.addEventListener('DOMContentLoaded', initApp);
+

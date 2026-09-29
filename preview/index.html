@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EyeCare 20-20-20 护眼助手仿真预览</title>
+  <title>EyeCare 护眼助手仿真预览</title>
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -42,8 +42,75 @@
             </div>
           </header>
 
-          <!-- 模拟手机当前正在运行的应用界面（文章阅读/工作流） -->
-          <main class="simulated-app-content">
+          <!-- 场景切换栏（模拟在刷抖音短视频 vs 阅读文章） -->
+          <div class="phone-scene-switcher">
+            <button class="scene-tab-btn active" id="tabVideo" type="button">🎵 抖音短视频</button>
+            <button class="scene-tab-btn" id="tabArticle" type="button">📰 深度阅读</button>
+          </div>
+
+          <!-- 场景 1：模拟抖音短视频播放界面 -->
+          <main class="simulated-video-content" id="simulatedVideoContent">
+            <!-- 仿真视频背景光晕与画面 -->
+            <div class="video-bg-layer">
+              <div class="video-gradient-orb orb-1"></div>
+              <div class="video-gradient-orb orb-2"></div>
+              <div class="video-badge-status" id="videoBadgeStatus">
+                <span class="status-pulse-dot"></span>
+                <span id="videoStatusText">短视频正在播放中</span>
+              </div>
+            </div>
+
+            <!-- 右侧互动按钮悬浮列 -->
+            <aside class="video-side-actions">
+              <div class="video-author-avatar">
+                <div class="avatar-circle">👀</div>
+                <span class="avatar-plus">+</span>
+              </div>
+              <div class="video-action-btn">
+                <span class="action-icon">❤️</span>
+                <span class="action-count">28.6w</span>
+              </div>
+              <div class="video-action-btn">
+                <span class="action-icon">💬</span>
+                <span class="action-count">3890</span>
+              </div>
+              <div class="video-action-btn">
+                <span class="action-icon">⭐</span>
+                <span class="action-count">1.4w</span>
+              </div>
+              <div class="video-action-btn">
+                <span class="action-icon">↗️</span>
+                <span class="action-count">2105</span>
+              </div>
+
+              <!-- 旋转黑胶唱片（遮罩弹出时停止旋转，遮罩关闭时恢复旋转） -->
+              <div class="vinyl-disc-container" id="vinylDiscContainer">
+                <div class="vinyl-disc" id="vinylDisc">
+                  <div class="disc-inner"></div>
+                </div>
+              </div>
+            </aside>
+
+            <!-- 底部作者与音频信息 -->
+            <footer class="video-bottom-info">
+              <div class="video-author-name">@EyeCare 护眼科普</div>
+              <p class="video-caption">刷短视频也要遵循 20-20-20 护眼法则！弹出遮罩时播放会自动暂停，20秒远眺结束后将自动恢复播放~ 🌿✨</p>
+              
+              <!-- 音乐律动声波条（暂停时平缓归零） -->
+              <div class="video-music-strip">
+                <div class="sound-wave" id="soundWave">
+                  <span class="bar bar-1"></span>
+                  <span class="bar bar-2"></span>
+                  <span class="bar bar-3"></span>
+                  <span class="bar bar-4"></span>
+                </div>
+                <span class="music-title">原声 - 舒适远眺舒缓音乐 (自动联动)</span>
+              </div>
+            </footer>
+          </main>
+
+          <!-- 场景 2：模拟文章阅读界面 -->
+          <main class="simulated-app-content hidden" id="simulatedAppContent">
             <div class="app-hero-card">
               <span class="app-tag">深度阅读</span>
               <h2 class="app-title">健康用眼：20-20-20 科学远眺法</h2>
@@ -71,8 +138,8 @@
                   <span class="metric-desc">闭目或放松睫状肌</span>
                 </div>
               </div>
-              <p>科学建议每使用电子屏幕 20 分钟，便将视线转向至少 20 英尺（约 6 米）外的远景，并保持 20 秒，让睫状肌彻底从持续紧绷中恢复弹性。</p>
-              <p>本程序采用<strong>纯视觉静音与无震动</strong>提醒，完全通过屏幕柔和半透明暗色遮罩自动引导，在不打扰会议或沉浸工作的前提下保护视力健康。</p>
+              <p>科学建议每使用电子屏幕一段时间，便将视线转向至少 20 英尺（约 6 米）外的远景，并保持 20 秒，让睫状肌彻底从持续紧绷中恢复弹性。</p>
+              <p>本程序采用<strong>纯视觉静音与无震动</strong>提醒，支持自定义运行时间，并联动抖音等视频自动暂停与恢复播放。</p>
             </article>
 
             <!-- 底部模拟导航条 -->
@@ -109,7 +176,7 @@
               <div class="overlay-guidance">
                 <h3 class="guidance-title" id="guidanceTitle">远眺放松时刻</h3>
                 <p class="guidance-desc" id="guidanceDesc">请将视线移开屏幕，眺望 6 米（20英尺）外的景物</p>
-                <p class="guidance-subtip">无需任何操作，倒计时归零后将自动淡出恢复</p>
+                <p class="guidance-subtip" id="guidanceMediaSubtip">音视频已自动暂停 · 倒计时归零后将自动恢复</p>
               </div>
 
               <!-- 倒计时进度状态条（底部微型辅助光条） -->
@@ -127,8 +194,8 @@
     <aside class="control-panel-container">
       <div class="panel-header">
         <div class="panel-badge">Web 仿真预览器</div>
-        <h1 class="panel-title">EyeCare 20-20-20</h1>
-        <p class="panel-subtitle">纯视觉静音无打扰 · 交互与参数实时调优</p>
+        <h1 class="panel-title">EyeCare</h1>
+        <p class="panel-subtitle">纯视觉静音 · 视频自动暂停联动 · 运行时间自定义</p>
       </div>
 
       <!-- 状态监控看板 -->
@@ -148,8 +215,16 @@
             <span class="value" id="dispTargetTime">10 秒后 (测试)</span>
           </div>
           <div class="status-item">
+            <span class="label">媒体播放状态</span>
+            <span class="value" id="dispMediaState">播放中 (抖音)</span>
+          </div>
+          <div class="status-item">
             <span class="label">遮罩状态</span>
             <span class="value" id="dispOverlayState">就绪中</span>
+          </div>
+          <div class="status-item">
+            <span class="label">当前设定周期</span>
+            <span class="value" id="dispConfiguredCycle">10 秒 (测试)</span>
           </div>
         </div>
 
@@ -164,8 +239,63 @@
           </button>
           <button class="btn btn-primary" id="btnTriggerNow" type="button">
             <span class="btn-icon">▶</span>
-            <span>立即弹出遮罩测试</span>
+            <span>立即弹出遮罩测试 (20秒)</span>
           </button>
+        </div>
+      </section>
+
+      <!-- 运行时间设置 -->
+      <section class="panel-card">
+        <h2 class="card-title">运行时间设置 (触发周期)</h2>
+
+        <!-- 常用预设档位胶囊 -->
+        <div class="preset-chips-container">
+          <button class="chip-btn active" data-cycle="10" type="button">10 秒 (测试)</button>
+          <button class="chip-btn" data-cycle="600" type="button">10 分钟</button>
+          <button class="chip-btn" data-cycle="900" type="button">15 分钟</button>
+          <button class="chip-btn" data-cycle="1200" type="button">20 分钟 (标准)</button>
+          <button class="chip-btn" data-cycle="1800" type="button">30 分钟</button>
+          <button class="chip-btn" data-cycle="2700" type="button">45 分钟</button>
+        </div>
+
+        <!-- 自定义输入 -->
+        <div class="custom-time-row">
+          <label for="inputCustomValue" class="custom-label">自定义时间:</label>
+          <input type="number" id="inputCustomValue" class="custom-number-input" placeholder="数值" min="1" value="25">
+          <select id="selectCustomUnit" class="custom-unit-select">
+            <option value="60" selected>分钟</option>
+            <option value="1">秒</option>
+          </select>
+          <button id="btnApplyCustomCycle" class="btn btn-secondary btn-sm" type="button">应用</button>
+        </div>
+
+        <!-- 远眺倒计时时长调节 -->
+        <div class="control-row" style="margin-top: 14px;">
+          <div class="control-label-row">
+            <label for="inputRestDuration">远眺倒计时时长 (Rest Duration)</label>
+            <span class="param-val" id="valRestDuration">20秒</span>
+          </div>
+          <input type="range" id="inputRestDuration" min="5" max="60" step="1" value="20">
+        </div>
+      </section>
+
+      <!-- 媒体暂停联动设置 -->
+      <section class="panel-card">
+        <h2 class="card-title">音视频暂停联动 (抖音 / 快手 / 音乐)</h2>
+        <div class="toggle-switch-row">
+          <div class="toggle-text-info">
+            <span class="toggle-title">遮罩弹出时自动暂停视频播放</span>
+            <span class="toggle-desc">遮罩出现时暂停抖音播放，20秒远眺结束后自动恢复播放</span>
+          </div>
+          <label class="switch-ui">
+            <input type="checkbox" id="checkPauseMedia" checked>
+            <span class="slider round"></span>
+          </label>
+        </div>
+
+        <div class="scene-toggle-row">
+          <span class="scene-label">模拟手机当前场景:</span>
+          <button class="btn btn-secondary btn-sm" id="btnToggleScene" type="button">切换为阅读模式</button>
         </div>
       </section>
 
@@ -199,46 +329,15 @@
           </div>
           <input type="range" id="inputFontScale" min="40" max="96" step="2" value="64">
         </div>
-
-        <!-- 标题与文案字号 -->
-        <div class="control-row">
-          <div class="control-label-row">
-            <label for="inputDescFontScale">提示文案字号</label>
-            <span class="param-val" id="valDescFontScale">15px</span>
-          </div>
-          <input type="range" id="inputDescFontScale" min="12" max="22" step="1" value="15">
-        </div>
-      </section>
-
-      <!-- 计时逻辑参数 -->
-      <section class="panel-card">
-        <h2 class="card-title">业务计时规则</h2>
-
-        <!-- 亮屏触发周期切换 -->
-        <div class="control-row">
-          <span class="control-text-label">亮屏触发周期</span>
-          <div class="segmented-control">
-            <button class="seg-btn active" data-cycle="10" id="segCycle10" type="button">10 秒 (快速测试)</button>
-            <button class="seg-btn" data-cycle="1200" id="segCycle1200" type="button">20 分钟 (正式标准)</button>
-          </div>
-        </div>
-
-        <!-- 远眺倒计时时长调节 -->
-        <div class="control-row">
-          <div class="control-label-row">
-            <label for="inputRestDuration">远眺倒计时时长 (Rest Duration)</label>
-            <span class="param-val" id="valRestDuration">20秒</span>
-          </div>
-          <input type="range" id="inputRestDuration" min="5" max="60" step="1" value="20">
-        </div>
       </section>
 
       <!-- 静默特性声明 -->
       <footer class="panel-footer">
         <div class="feature-tag">✔ 纯视觉引导</div>
+        <div class="feature-tag">✔ 抖音/视频自动暂停与恢复</div>
         <div class="feature-tag">✔ 严禁外放音频</div>
         <div class="feature-tag">✔ 严格无震动</div>
-        <div class="feature-tag">✔ 自动淡出循环</div>
+        <div class="feature-tag">✔ 运行时间自由调节</div>
       </footer>
     </aside>
   </div>

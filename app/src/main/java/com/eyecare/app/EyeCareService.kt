@@ -9,6 +9,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.PixelFormat
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.os.Build
 import android.os.CountDownTimer
 import android.os.Handler
@@ -38,7 +41,12 @@ class EyeCareService : Service() {
         private const val NOTIFICATION_CHANNEL_ID = "eyecare_silent_channel"
         private const val NOTIFICATION_ID = 202020
 
-        // 标准工作周期：20 分钟 = 1200 秒 (可由 Intent 传入测试模式参数)
+        // 持久化配置键名
+        const val PREFS_NAME = "eyecare_prefs"
+        const val KEY_WORK_CYCLE_SECONDS = "pref_work_cycle_seconds"
+        const val KEY_PAUSE_MEDIA = "pref_pause_media"
+
+        // 标准工作周期：20 分钟 = 1200 秒
         const val DEFAULT_WORK_CYCLE_SECONDS = 20 * 60
         // 远眺倒计时休息时长：20 秒
         const val REST_COUNTDOWN_SECONDS = 20
@@ -47,6 +55,11 @@ class EyeCareService : Service() {
         const val ACTION_START = "com.eyecare.app.ACTION_START"
         const val ACTION_STOP = "com.eyecare.app.ACTION_STOP"
         const val ACTION_TRIGGER_TEST = "com.eyecare.app.ACTION_TRIGGER_TEST"
+        const val ACTION_UPDATE_CONFIG = "com.eyecare.app.ACTION_UPDATE_CONFIG"
+
+        // Intent 传递参数 Key
+        const val EXTRA_WORK_CYCLE_SECONDS = "extra_work_cycle_seconds"
+        const val EXTRA_PAUSE_MEDIA = "extra_pause_media"
         const val EXTRA_TEST_CYCLE_SECONDS = "extra_test_cycle_seconds"
     }
 
@@ -54,6 +67,12 @@ class EyeCareService : Service() {
     private var windowManager: WindowManager? = null
     private var overlayView: View? = null
     private var countDownTimer: CountDownTimer? = null
+
+    // 音频焦点管理器：用于在弹出遮罩时暂停外部音视频（如抖音、快手、音乐），遮罩关闭时恢复
+    private var audioManager: AudioManager? = null
+    private var audioFocusRequest: AudioFocusRequest? = null
+    private var hasRequestedAudioFocus = false
+    private var isPauseMediaEnabled = true
 
     // 状态与计时
     private var isScreenOn = true
@@ -113,9 +132,12 @@ class EyeCareService : Service() {
         }
         registerReceiver(screenReceiver, filter)
 
+        // 从持久化偏好载入用户配置
+        loadPreferences()
+
         // 启动主计时器循环
         mainHandler.post(timerRunnable)
-        Log.i(TAG, "EyeCare 护眼服务启动成功，当前处于静默运行模式")
+        Log.i(TAG, "EyeCare 护眼服务启动成功，运行周期: ${currentWorkCycleSeconds} 秒，媒体自动暂停: $isPauseMediaEnabled")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -128,13 +150,24 @@ class EyeCareService : Service() {
                 // 手动立即触发遮罩测试
                 showEyeCareOverlay()
             }
-            else -> {
-                // 允许从 Intent 中配置测试周期时长（如 10 秒快速验证）
-                val customCycle = intent?.getIntExtra(EXTRA_TEST_CYCLE_SECONDS, DEFAULT_WORK_CYCLE_SECONDS)
-                if (customCycle != null && customCycle > 0) {
+            ACTION_UPDATE_CONFIG, ACTION_START -> {
+                // 动态更新配置（支持自定义运行时间与媒体暂停开关）
+                val customCycle = intent?.getIntExtra(EXTRA_WORK_CYCLE_SECONDS, -1) ?: -1
+                val legacyTestCycle = intent?.getIntExtra(EXTRA_TEST_CYCLE_SECONDS, -1) ?: -1
+
+                if (customCycle > 0) {
                     currentWorkCycleSeconds = customCycle
-                    Log.d(TAG, "已更新触发周期为: ${currentWorkCycleSeconds} 秒")
+                } else if (legacyTestCycle > 0) {
+                    currentWorkCycleSeconds = legacyTestCycle
+                } else {
+                    loadPreferences()
                 }
+
+                if (intent != null && intent.hasExtra(EXTRA_PAUSE_MEDIA)) {
+                    isPauseMediaEnabled = intent.getBooleanExtra(EXTRA_PAUSE_MEDIA, true)
+                }
+
+                Log.d(TAG, "已更新配置: 运行周期=${currentWorkCycleSeconds}秒, 自动暂停媒体=$isPauseMediaEnabled")
             }
         }
         return START_STICKY
@@ -183,6 +216,9 @@ class EyeCareService : Service() {
             windowManager?.addView(view, params)
             isOverlayShowing = true
 
+            // 请求瞬态音频焦点以暂停外部音视频播放（如抖音等）
+            requestMediaPause()
+
             // 初始化倒计时文本
             val tvCountdown = view.findViewById<TextView>(R.id.tvCountdownSeconds)
             tvCountdown?.text = REST_COUNTDOWN_SECONDS.toString()
@@ -225,6 +261,9 @@ class EyeCareService : Service() {
         overlayView = null
         isOverlayShowing = false
 
+        // 释放音频焦点，恢复外部音视频播放（如抖音等）
+        abandonMediaPause()
+
         // 清零累计亮屏秒数，开启下一轮静默循环
         accumulatedScreenSeconds = 0
         Log.i(TAG, "本轮远眺结束，遮罩已自动移除，重置计时并静默进入下一轮循环")
@@ -261,7 +300,7 @@ class EyeCareService : Service() {
         }
 
         return builder
-            .setContentTitle("EyeCare 20-20-20")
+            .setContentTitle("EyeCare")
             .setContentText(content)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setOngoing(true)
@@ -288,7 +327,80 @@ class EyeCareService : Service() {
             } catch (ignored: Exception) {}
         }
 
+        // 确保服务销毁时释放音频焦点
+        abandonMediaPause()
+
         Log.i(TAG, "EyeCare 护眼服务已停止")
+    }
+
+    /**
+     * 从 SharedPreferences 载入运行周期和暂停媒体偏好设置
+     */
+    private fun loadPreferences() {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        currentWorkCycleSeconds = prefs.getInt(KEY_WORK_CYCLE_SECONDS, DEFAULT_WORK_CYCLE_SECONDS)
+        isPauseMediaEnabled = prefs.getBoolean(KEY_PAUSE_MEDIA, true)
+    }
+
+    /**
+     * 申请瞬态音频焦点，触发正在播放的外部应用（如抖音、快手、音乐）暂停
+     */
+    private fun requestMediaPause() {
+        if (!isPauseMediaEnabled) return
+        try {
+            if (audioManager == null) {
+                audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            }
+            val am = audioManager ?: return
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val playbackAttributes = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+
+                audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                    .setAudioAttributes(playbackAttributes)
+                    .setAcceptsDelayedFocusGain(false)
+                    .setOnAudioFocusChangeListener { /* 静默监听焦点变动 */ }
+                    .build()
+
+                val res = am.requestAudioFocus(audioFocusRequest!!)
+                hasRequestedAudioFocus = (res == AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+            } else {
+                @Suppress("DEPRECATION")
+                val res = am.requestAudioFocus(
+                    { /* 静默监听焦点变动 */ },
+                    AudioManager.STREAM_MUSIC,
+                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+                )
+                hasRequestedAudioFocus = (res == AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+            }
+            Log.d(TAG, "申请瞬态音频焦点成功，已请求暂停外部音视频: $hasRequestedAudioFocus")
+        } catch (e: Exception) {
+            Log.e(TAG, "申请瞬态音频焦点异常: ${e.message}", e)
+        }
+    }
+
+    /**
+     * 释放瞬态音频焦点，通知系统让先前的媒体应用（如抖音等）恢复播放
+     */
+    private fun abandonMediaPause() {
+        if (!hasRequestedAudioFocus) return
+        try {
+            val am = audioManager ?: return
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                audioFocusRequest?.let { am.abandonAudioFocusRequest(it) }
+                audioFocusRequest = null
+            } else {
+                @Suppress("DEPRECATION")
+                am.abandonAudioFocus { /* 静默释放 */ }
+            }
+            hasRequestedAudioFocus = false
+            Log.d(TAG, "已释放瞬态音频焦点，已通知外部音视频恢复播放")
+        } catch (e: Exception) {
+            Log.e(TAG, "释放瞬态音频焦点异常: ${e.message}", e)
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

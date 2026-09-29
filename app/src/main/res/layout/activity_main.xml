@@ -1,79 +1,236 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="24dp"
-    android:gravity="center_horizontal"
+    android:fillViewport="true"
     android:background="#0F141C">
 
-    <!-- 应用标题 -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/app_name"
-        android:textColor="#FFFFFF"
-        android:textSize="24sp"
-        android:textStyle="bold"
-        android:layout_marginTop="32dp" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="20-20-20 纯视觉护眼助手 (无声无震动)"
-        android:textColor="#8896AA"
-        android:textSize="13sp"
-        android:layout_marginTop="6dp" />
-
-    <!-- 状态监控展示卡片 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:background="#1B2230"
-        android:padding="18dp"
-        android:layout_marginTop="28dp"
-        android:layout_marginBottom="24dp">
+        android:padding="20dp"
+        android:gravity="center_horizontal">
+
+        <!-- 应用标题 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            android:textColor="#FFFFFF"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp" />
 
         <TextView
-            android:id="@+id/tvStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="20-20-20 纯视觉护眼助手 (无声无震动)"
+            android:textColor="#8896AA"
+            android:textSize="13sp"
+            android:layout_marginTop="4dp" />
+
+        <!-- 状态监控展示卡片 -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="#D5E0EE"
+            android:orientation="vertical"
+            android:background="#1B2230"
+            android:padding="16dp"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:id="@+id/tvStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="#D5E0EE"
+                android:textSize="13sp"
+                android:lineSpacingExtra="5dp"
+                android:text="正在初始化状态..." />
+        </LinearLayout>
+
+        <!-- 运行时间设置卡片 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#171E2B"
+            android:padding="16dp"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="运行时间设置 (亮屏累计触发周期)"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="10dp" />
+
+            <!-- 第一排预设按钮 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <Button
+                    android:id="@+id/btnCycle10s"
+                    android:layout_width="0dp"
+                    android:layout_height="40dp"
+                    android:layout_weight="1"
+                    android:text="10秒(测试)"
+                    android:textColor="#D5E0EE"
+                    android:backgroundTint="#263144"
+                    android:textSize="12sp"
+                    android:layout_marginEnd="4dp" />
+
+                <Button
+                    android:id="@+id/btnCycle10m"
+                    android:layout_width="0dp"
+                    android:layout_height="40dp"
+                    android:layout_weight="1"
+                    android:text="10分钟"
+                    android:textColor="#D5E0EE"
+                    android:backgroundTint="#263144"
+                    android:textSize="12sp"
+                    android:layout_marginEnd="4dp" />
+
+                <Button
+                    android:id="@+id/btnCycle15m"
+                    android:layout_width="0dp"
+                    android:layout_height="40dp"
+                    android:layout_weight="1"
+                    android:text="15分钟"
+                    android:textColor="#D5E0EE"
+                    android:backgroundTint="#263144"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- 第二排预设按钮 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="12dp">
+
+                <Button
+                    android:id="@+id/btnCycle20m"
+                    android:layout_width="0dp"
+                    android:layout_height="40dp"
+                    android:layout_weight="1"
+                    android:text="20分(推荐)"
+                    android:textColor="#051410"
+                    android:backgroundTint="#38EF7D"
+                    android:textStyle="bold"
+                    android:textSize="12sp"
+                    android:layout_marginEnd="4dp" />
+
+                <Button
+                    android:id="@+id/btnCycle30m"
+                    android:layout_width="0dp"
+                    android:layout_height="40dp"
+                    android:layout_weight="1"
+                    android:text="30分钟"
+                    android:textColor="#D5E0EE"
+                    android:backgroundTint="#263144"
+                    android:textSize="12sp"
+                    android:layout_marginEnd="4dp" />
+
+                <Button
+                    android:id="@+id/btnCycle45m"
+                    android:layout_width="0dp"
+                    android:layout_height="40dp"
+                    android:layout_weight="1"
+                    android:text="45分钟"
+                    android:textColor="#D5E0EE"
+                    android:backgroundTint="#263144"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- 自定义时长输入 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <EditText
+                    android:id="@+id/etCustomMinutes"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:hint="自定义分钟数 (如 25)"
+                    android:textColorHint="#627084"
+                    android:textColor="#FFFFFF"
+                    android:background="#1F2838"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:inputType="number"
+                    android:textSize="13sp"
+                    android:layout_marginEnd="8dp" />
+
+                <Button
+                    android:id="@+id/btnApplyCustomCycle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="44dp"
+                    android:text="应用"
+                    android:textColor="#FFFFFF"
+                    android:backgroundTint="#3B4C68"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 媒体播放联动设置卡片 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#171E2B"
+            android:padding="16dp"
+            android:layout_marginBottom="20dp">
+
+            <Switch
+                android:id="@+id/switchPauseMedia"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="遮罩弹出时暂停音视频播放"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:checked="true" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="刷抖音、快手或听音乐时自动暂停，20秒远眺结束后自动恢复播放"
+                android:textColor="#8896AA"
+                android:textSize="12sp"
+                android:layout_marginTop="6dp" />
+        </LinearLayout>
+
+        <!-- 主控操作按钮 -->
+        <Button
+            android:id="@+id/btnToggleService"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:text="开启护眼守护"
+            android:textColor="#051410"
+            android:backgroundTint="#38EF7D"
+            android:textStyle="bold"
+            android:textSize="15sp"
+            android:layout_marginBottom="10dp" />
+
+        <Button
+            android:id="@+id/btnTriggerTest"
+            android:layout_width="match_parent"
+            android:layout_height="46dp"
+            android:text="立即弹出遮罩测试 (20秒)"
+            android:textColor="#E0E6F0"
+            android:backgroundTint="#263144"
             android:textSize="14sp"
-            android:lineSpacingExtra="6dp"
-            android:text="正在初始化状态..." />
+            android:layout_marginBottom="16dp" />
+
     </LinearLayout>
-
-    <!-- 主控操作按钮 -->
-    <Button
-        android:id="@+id/btnToggleService"
-        android:layout_width="match_parent"
-        android:layout_height="52dp"
-        android:text="开启护眼守护"
-        android:textColor="#051410"
-        android:backgroundTint="#38EF7D"
-        android:textStyle="bold"
-        android:textSize="15sp"
-        android:layout_marginBottom="12dp" />
-
-    <Button
-        android:id="@+id/btnToggleTestMode"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:text="切换为 10 秒测试模式"
-        android:textColor="#E0E6F0"
-        android:backgroundTint="#263144"
-        android:textSize="14sp"
-        android:layout_marginBottom="12dp" />
-
-    <Button
-        android:id="@+id/btnTriggerTest"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:text="立即弹出遮罩测试 (20秒)"
-        android:textColor="#E0E6F0"
-        android:backgroundTint="#263144"
-        android:textSize="14sp" />
-
-</LinearLayout>
+</ScrollView>

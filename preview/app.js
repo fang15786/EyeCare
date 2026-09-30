@@ -304,12 +304,12 @@ function updateDashboard() {
   // 1. 累计亮屏时间
   elements.dispScreenTime.textContent = formatTime(appState.screenOnSeconds);
 
-  // 2. 距离下一次触发
+  // 2. 距离下一次遮罩触发的剩余使用时间倒计时
   if (appState.isOverlayShowing) {
-    elements.dispTargetTime.textContent = '正在远眺中...';
+    elements.dispTargetTime.textContent = '远眺休息中...';
   } else {
     const remainToTrigger = Math.max(0, appState.workCycleDuration - appState.screenOnSeconds);
-    elements.dispTargetTime.textContent = `${remainToTrigger} 秒后`;
+    elements.dispTargetTime.textContent = formatTime(remainToTrigger);
   }
 
   // 3. 设定周期

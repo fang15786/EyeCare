@@ -18,6 +18,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
@@ -31,8 +32,10 @@ import android.widget.TextView
  *
  * 核心设计原则：
  * 1. 【纯视觉静默】：坚决无任何外放声音，无任何震动（未申请亦未调用任何 Vibrator 接口）。
- * 2. 【仅计亮屏】：动态监听 SCREEN_ON / SCREEN_OFF，黑屏锁屏期间完全挂起计时，亮屏期间继续累计。
- * 3. 【自动循环】：累计亮屏满 20 分钟弹出全屏半透明遮罩，20 秒倒计时归零后遮罩自动销毁，计时归零静默进入下一轮。
+ * 2. 【仅计亮屏】：动态监听 SCREEN_ON / SCREEN_OFF，黑屏锁屏期间完全挂起计时，亮屏期间基于 SystemClock 真实时钟差值精准累计。
+ * 3. 【实时倒计时】：通知栏与外部界面实时展示“距离下次远眺”剩余使用倒计时，秒数公开可查。
+ * 4. 【防杀接力】：累计时长持久化存储，若系统后台杀进程重启后无缝接力继续倒数，防止重置归零。
+ * 5. 【自动循环】：累计亮屏满周期后弹出全屏半透明遮罩，20 秒倒计时归零后遮罩自动销毁，静默进入下一轮。
  */
 class EyeCareService : Service() {
 
@@ -45,6 +48,7 @@ class EyeCareService : Service() {
         const val PREFS_NAME = "eyecare_prefs"
         const val KEY_WORK_CYCLE_SECONDS = "pref_work_cycle_seconds"
         const val KEY_PAUSE_MEDIA = "pref_pause_media"
+        const val KEY_ACCUMULATED_SECONDS = "pref_accumulated_seconds"
 
         // 标准工作周期：20 分钟 = 1200 秒
         const val DEFAULT_WORK_CYCLE_SECONDS = 20 * 60
@@ -61,6 +65,19 @@ class EyeCareService : Service() {
         const val EXTRA_WORK_CYCLE_SECONDS = "extra_work_cycle_seconds"
         const val EXTRA_PAUSE_MEDIA = "extra_pause_media"
         const val EXTRA_TEST_CYCLE_SECONDS = "extra_test_cycle_seconds"
+
+        // 全局公开响应状态（供 MainActivity 实时观测绑定，线程可见）
+        @Volatile
+        var isRunning: Boolean = false
+            private set
+
+        @Volatile
+        var currentRemainingSeconds: Int = DEFAULT_WORK_CYCLE_SECONDS
+            private set
+
+        @Volatile
+        var configuredCycleSeconds: Int = DEFAULT_WORK_CYCLE_SECONDS
+            private set
     }
 
     // WindowManager 与悬浮窗视图
@@ -80,18 +97,36 @@ class EyeCareService : Service() {
     private var currentWorkCycleSeconds = DEFAULT_WORK_CYCLE_SECONDS
     private var isOverlayShowing = false
 
+    // 高精度时间戳记录（毫秒，防系统休眠与后台降频）
+    private var lastScreenOnTimestamp = 0L
+    private var lastNotificationRemainingSeconds = -1
+
     // 计时主循环 Handler
     private val mainHandler = Handler(Looper.getMainLooper())
     private val timerRunnable = object : Runnable {
         override fun run() {
             if (isScreenOn && !isOverlayShowing) {
-                accumulatedScreenSeconds++
+                val now = SystemClock.elapsedRealtime()
+                val deltaMillis = now - lastScreenOnTimestamp
+                if (deltaMillis >= 1000) {
+                    val deltaSeconds = (deltaMillis / 1000).toInt()
+                    accumulatedScreenSeconds += deltaSeconds
+                    lastScreenOnTimestamp += deltaSeconds * 1000L
+                    saveAccumulatedTime()
+                }
+
+                val remaining = (currentWorkCycleSeconds - accumulatedScreenSeconds).coerceAtLeast(0)
+                currentRemainingSeconds = remaining
+
+                // 动态刷新通知栏使用倒计时
+                checkAndUpdateNotification(remaining)
+
                 // 累计达到工作周期上限，触发全屏远眺遮罩
                 if (accumulatedScreenSeconds >= currentWorkCycleSeconds) {
                     showEyeCareOverlay()
                 }
             }
-            // 每秒执行一次
+            // 每秒轮询校准
             mainHandler.postDelayed(this, 1000)
         }
     }
@@ -103,9 +138,19 @@ class EyeCareService : Service() {
                 Intent.ACTION_SCREEN_ON -> {
                     Log.d(TAG, "检测到屏幕点亮：恢复亮屏累计计时")
                     isScreenOn = true
+                    lastScreenOnTimestamp = SystemClock.elapsedRealtime()
                 }
                 Intent.ACTION_SCREEN_OFF -> {
                     Log.d(TAG, "检测到屏幕熄灭/锁屏：暂停计时")
+                    if (isScreenOn) {
+                        val now = SystemClock.elapsedRealtime()
+                        val deltaMillis = now - lastScreenOnTimestamp
+                        if (deltaMillis >= 1000) {
+                            val deltaSeconds = (deltaMillis / 1000).toInt()
+                            accumulatedScreenSeconds += deltaSeconds
+                        }
+                        saveAccumulatedTime()
+                    }
                     isScreenOn = false
                 }
             }
@@ -114,16 +159,32 @@ class EyeCareService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        isRunning = true
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
-        // 创建低优先级纯静默前台通知（无铃声、无震动、不弹出浮窗干扰）
+        // 从持久化偏好载入用户配置
+        loadPreferences()
+        configuredCycleSeconds = currentWorkCycleSeconds
+
+        // 载入历史累计秒数（防后台被杀重启归零）
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        accumulatedScreenSeconds = prefs.getInt(KEY_ACCUMULATED_SECONDS, 0)
+        if (accumulatedScreenSeconds >= currentWorkCycleSeconds) {
+            accumulatedScreenSeconds = 0
+            saveAccumulatedTime()
+        }
+        currentRemainingSeconds = (currentWorkCycleSeconds - accumulatedScreenSeconds).coerceAtLeast(0)
+
+        // 创建低优先级纯静默前台通知（实时展示使用倒计时）
         createSilentNotificationChannel()
-        val notification = buildSilentNotification("护眼守护中：仅累计亮屏时间")
+        val initialContent = formatCountdownText(currentRemainingSeconds)
+        val notification = buildSilentNotification(initialContent)
         startForeground(NOTIFICATION_ID, notification)
 
-        // 检测初始屏幕亮灭状态
+        // 检测初始屏幕亮灭状态并初始化时间戳
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         isScreenOn = powerManager.isInteractive
+        lastScreenOnTimestamp = SystemClock.elapsedRealtime()
 
         // 注册屏幕开闭广播
         val filter = IntentFilter().apply {
@@ -132,12 +193,9 @@ class EyeCareService : Service() {
         }
         registerReceiver(screenReceiver, filter)
 
-        // 从持久化偏好载入用户配置
-        loadPreferences()
-
         // 启动主计时器循环
         mainHandler.post(timerRunnable)
-        Log.i(TAG, "EyeCare 护眼服务启动成功，运行周期: ${currentWorkCycleSeconds} 秒，媒体自动暂停: $isPauseMediaEnabled")
+        Log.i(TAG, "EyeCare 护眼服务启动成功，运行周期: ${currentWorkCycleSeconds} 秒，当前剩余倒计时: ${currentRemainingSeconds} 秒")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -163,11 +221,20 @@ class EyeCareService : Service() {
                     loadPreferences()
                 }
 
+                configuredCycleSeconds = currentWorkCycleSeconds
+                if (accumulatedScreenSeconds >= currentWorkCycleSeconds) {
+                    accumulatedScreenSeconds = 0
+                    saveAccumulatedTime()
+                }
+                currentRemainingSeconds = (currentWorkCycleSeconds - accumulatedScreenSeconds).coerceAtLeast(0)
+                lastNotificationRemainingSeconds = -1
+                checkAndUpdateNotification(currentRemainingSeconds)
+
                 if (intent != null && intent.hasExtra(EXTRA_PAUSE_MEDIA)) {
                     isPauseMediaEnabled = intent.getBooleanExtra(EXTRA_PAUSE_MEDIA, true)
                 }
 
-                Log.d(TAG, "已更新配置: 运行周期=${currentWorkCycleSeconds}秒, 自动暂停媒体=$isPauseMediaEnabled")
+                Log.d(TAG, "已更新配置: 运行周期=${currentWorkCycleSeconds}秒, 剩余倒计时=${currentRemainingSeconds}秒")
             }
         }
         return START_STICKY
@@ -266,7 +333,52 @@ class EyeCareService : Service() {
 
         // 清零累计亮屏秒数，开启下一轮静默循环
         accumulatedScreenSeconds = 0
+        saveAccumulatedTime()
+        lastScreenOnTimestamp = SystemClock.elapsedRealtime()
+        currentRemainingSeconds = currentWorkCycleSeconds
+        lastNotificationRemainingSeconds = -1
+        checkAndUpdateNotification(currentRemainingSeconds)
         Log.i(TAG, "本轮远眺结束，遮罩已自动移除，重置计时并静默进入下一轮循环")
+    }
+
+    /**
+     * 将累计秒数持久化存储至 SharedPreferences
+     */
+    private fun saveAccumulatedTime() {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putInt(KEY_ACCUMULATED_SECONDS, accumulatedScreenSeconds).apply()
+    }
+
+    /**
+     * 智能检查并刷新前台通知栏倒计时
+     * 倒计时 <= 30 秒时每秒刷新；> 30 秒时每 5 秒刷新，兼顾视觉即时性与系统性能
+     */
+    private fun checkAndUpdateNotification(remaining: Int) {
+        if (lastNotificationRemainingSeconds == -1 || remaining <= 30 || Math.abs(lastNotificationRemainingSeconds - remaining) >= 5) {
+            lastNotificationRemainingSeconds = remaining
+            val contentText = formatCountdownText(remaining)
+            val notification = buildSilentNotification(contentText)
+            val manager = getSystemService(NotificationManager::class.java)
+            manager?.notify(NOTIFICATION_ID, notification)
+        }
+    }
+
+    /**
+     * 格式化倒计时文本展示文案
+     */
+    private fun formatCountdownText(remainingSeconds: Int): String {
+        val cycleLabel = if (currentWorkCycleSeconds < 60) "${currentWorkCycleSeconds}秒" else "${currentWorkCycleSeconds / 60}分钟"
+        return if (remainingSeconds < 60) {
+            "距离下次远眺倒计时: ${remainingSeconds}秒 (周期: $cycleLabel)"
+        } else {
+            val mins = remainingSeconds / 60
+            val secs = remainingSeconds % 60
+            if (secs == 0) {
+                "距离下次远眺倒计时: ${mins}分钟 (周期: $cycleLabel)"
+            } else {
+                "距离下次远眺倒计时: ${mins}分${secs}秒 (周期: $cycleLabel)"
+            }
+        }
     }
 
     /**
@@ -300,7 +412,7 @@ class EyeCareService : Service() {
         }
 
         return builder
-            .setContentTitle("EyeCare")
+            .setContentTitle("EyeCare 护眼守护中")
             .setContentText(content)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setOngoing(true)
@@ -309,6 +421,9 @@ class EyeCareService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        isRunning = false
+        saveAccumulatedTime()
+
         // 清理广播监听
         try {
             unregisterReceiver(screenReceiver)

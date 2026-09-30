@@ -30,6 +30,48 @@
             android:textSize="13sp"
             android:layout_marginTop="4dp" />
 
+        <!-- 核心：大字号使用时间倒计时看板 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#151E2B"
+            android:padding="20dp"
+            android:layout_marginTop="18dp"
+            android:layout_marginBottom="14dp"
+            android:gravity="center">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="距离下次全屏远眺倒计时"
+                android:textColor="#8EA4C2"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <!-- 大字号倒计时跳动展示 -->
+            <TextView
+                android:id="@+id/tvUsageCountdown"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="20:00"
+                android:textColor="#38EF7D"
+                android:textSize="52sp"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif-medium"
+                android:includeFontPadding="false"
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:id="@+id/tvCountdownTip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="仅在亮屏使用时计时 · 黑屏自动挂起暂停"
+                android:textColor="#5E738E"
+                android:textSize="12sp" />
+        </LinearLayout>
+
         <!-- 状态监控展示卡片 -->
         <LinearLayout
             android:layout_width="match_parent"
@@ -37,7 +79,6 @@
             android:orientation="vertical"
             android:background="#1B2230"
             android:padding="16dp"
-            android:layout_marginTop="20dp"
             android:layout_marginBottom="16dp">
 
             <TextView

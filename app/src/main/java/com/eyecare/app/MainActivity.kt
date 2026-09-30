@@ -8,6 +8,8 @@ import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.widget.Button
 import android.widget.EditText
@@ -17,7 +19,7 @@ import android.widget.Toast
 
 /**
  * EyeCare 20-20-20 主活动入口
- * 提供悬浮窗权限申请、服务启动/停止控制、运行周期时间设置以及音视频暂停联动配置
+ * 提供大字号使用时间倒计时展示、悬浮窗权限申请、服务启动/停止控制、运行周期时间设置以及音视频暂停联动配置
  */
 class MainActivity : Activity() {
 
@@ -27,6 +29,10 @@ class MainActivity : Activity() {
         private const val KEY_WORK_CYCLE_SECONDS = EyeCareService.KEY_WORK_CYCLE_SECONDS
         private const val KEY_PAUSE_MEDIA = EyeCareService.KEY_PAUSE_MEDIA
     }
+
+    // 倒计时核心看板控件
+    private lateinit var tvUsageCountdown: TextView
+    private lateinit var tvCountdownTip: TextView
 
     private lateinit var tvStatus: TextView
     private lateinit var btnToggleService: Button
@@ -51,6 +57,15 @@ class MainActivity : Activity() {
     private var selectedCycleSeconds = EyeCareService.DEFAULT_WORK_CYCLE_SECONDS
     private var isPauseMediaEnabled = true
 
+    // 前台每秒刷新倒计时 Handler
+    private val uiUpdateHandler = Handler(Looper.getMainLooper())
+    private val uiUpdateRunnable = object : Runnable {
+        override fun run() {
+            updateCountdownUI()
+            uiUpdateHandler.postDelayed(this, 1000)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -58,7 +73,7 @@ class MainActivity : Activity() {
         loadSavedPreferences()
         initViews()
         updatePresetButtonsVisual()
-        updateUI()
+        updateCountdownUI()
     }
 
     /**
@@ -82,6 +97,8 @@ class MainActivity : Activity() {
     }
 
     private fun initViews() {
+        tvUsageCountdown = findViewById(R.id.tvUsageCountdown)
+        tvCountdownTip = findViewById(R.id.tvCountdownTip)
         tvStatus = findViewById(R.id.tvStatus)
         btnToggleService = findViewById(R.id.btnToggleService)
         btnTriggerTest = findViewById(R.id.btnTriggerTest)
@@ -167,7 +184,7 @@ class MainActivity : Activity() {
         savePreferences()
         updatePresetButtonsVisual()
         syncConfigToService()
-        updateUI()
+        updateCountdownUI()
         Toast.makeText(this, "运行时间已设置为: $label", Toast.LENGTH_SHORT).show()
     }
 
@@ -238,7 +255,7 @@ class MainActivity : Activity() {
         }
 
         isServiceRunning = true
-        updateUI()
+        updateCountdownUI()
         Toast.makeText(this, "护眼服务已启动", Toast.LENGTH_SHORT).show()
     }
 
@@ -252,7 +269,7 @@ class MainActivity : Activity() {
         stopService(intent)
 
         isServiceRunning = false
-        updateUI()
+        updateCountdownUI()
         Toast.makeText(this, "护眼服务已停止", Toast.LENGTH_SHORT).show()
     }
 
@@ -302,6 +319,34 @@ class MainActivity : Activity() {
         }
     }
 
+    /**
+     * 实时刷新倒计时看板展示
+     */
+    private fun updateCountdownUI() {
+        val serviceRunning = EyeCareService.isRunning
+        isServiceRunning = serviceRunning
+        if (serviceRunning) {
+            val remaining = EyeCareService.currentRemainingSeconds
+            tvUsageCountdown.text = formatCountdownTimer(remaining)
+            tvUsageCountdown.setTextColor(Color.parseColor("#38EF7D"))
+            tvCountdownTip.text = "护眼守护运行中 · 仅在亮屏使用时倒计"
+        } else {
+            tvUsageCountdown.text = formatCountdownTimer(selectedCycleSeconds)
+            tvUsageCountdown.setTextColor(Color.parseColor("#6A7D94"))
+            tvCountdownTip.text = "服务未开启 · 点击下方按钮开启护眼守护"
+        }
+        updateUI()
+    }
+
+    /**
+     * 格式化 mm:ss 倒计时时间字符串
+     */
+    private fun formatCountdownTimer(totalSeconds: Int): String {
+        val mins = totalSeconds / 60
+        val secs = totalSeconds % 60
+        return String.format("%02d:%02d", mins, secs)
+    }
+
     private fun updateUI() {
         val permGranted = hasOverlayPermission()
         val cycleText = formatCycleText(selectedCycleSeconds)
@@ -319,6 +364,13 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        updateUI()
+        updatePresetButtonsVisual()
+        updateCountdownUI()
+        uiUpdateHandler.post(uiUpdateRunnable)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        uiUpdateHandler.removeCallbacks(uiUpdateRunnable)
     }
 }

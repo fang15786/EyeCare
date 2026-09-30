@@ -49,6 +49,7 @@ class EyeCareService : Service() {
         const val KEY_WORK_CYCLE_SECONDS = "pref_work_cycle_seconds"
         const val KEY_PAUSE_MEDIA = "pref_pause_media"
         const val KEY_ACCUMULATED_SECONDS = "pref_accumulated_seconds"
+        const val KEY_SERVICE_ENABLED = "pref_service_enabled"
 
         // 标准工作周期：20 分钟 = 1200 秒
         const val DEFAULT_WORK_CYCLE_SECONDS = 20 * 60
@@ -225,6 +226,8 @@ class EyeCareService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
+                // 用户主动点击停止护眼，记录持久化状态，防止解锁屏幕时误拉活
+                setServiceEnabledPref(false)
                 stopSelf()
                 return START_NOT_STICKY
             }
@@ -233,6 +236,8 @@ class EyeCareService : Service() {
                 showEyeCareOverlay()
             }
             ACTION_UPDATE_CONFIG, ACTION_START -> {
+                // 用户主动启动或更新配置，记录持久化状态为已启用
+                setServiceEnabledPref(true)
                 // 动态更新配置（支持自定义运行时间与媒体暂停开关）
                 val customCycle = intent?.getIntExtra(EXTRA_WORK_CYCLE_SECONDS, -1) ?: -1
                 val legacyTestCycle = intent?.getIntExtra(EXTRA_TEST_CYCLE_SECONDS, -1) ?: -1
@@ -392,6 +397,15 @@ class EyeCareService : Service() {
     private fun saveAccumulatedTime() {
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putInt(KEY_ACCUMULATED_SECONDS, accumulatedScreenSeconds).apply()
+    }
+
+    /**
+     * 将用户开启/停止服务的状态持久化存储至 SharedPreferences
+     * 供 BootAndUnlockReceiver 在解锁屏幕与开机时判断是否需要自动唤醒拉起服务
+     */
+    private fun setServiceEnabledPref(enabled: Boolean) {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(KEY_SERVICE_ENABLED, enabled).apply()
     }
 
     /**

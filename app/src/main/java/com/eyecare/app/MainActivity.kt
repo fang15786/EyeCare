@@ -28,6 +28,7 @@ class MainActivity : Activity() {
         private const val PREFS_NAME = EyeCareService.PREFS_NAME
         private const val KEY_WORK_CYCLE_SECONDS = EyeCareService.KEY_WORK_CYCLE_SECONDS
         private const val KEY_PAUSE_MEDIA = EyeCareService.KEY_PAUSE_MEDIA
+        private const val KEY_SERVICE_ENABLED = EyeCareService.KEY_SERVICE_ENABLED
     }
 
     // 倒计时核心看板控件
@@ -260,6 +261,11 @@ class MainActivity : Activity() {
         }
 
         isServiceRunning = true
+        // 记录用户主动开启护眼守护状态，供 BootAndUnlockReceiver 解锁自启识别
+        getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_SERVICE_ENABLED, true)
+            .apply()
+
         updateCountdownUI()
         Toast.makeText(this, "护眼服务已启动", Toast.LENGTH_SHORT).show()
 
@@ -279,6 +285,11 @@ class MainActivity : Activity() {
         stopService(intent)
 
         isServiceRunning = false
+        // 记录用户主动停止状态，防止解锁屏幕时自动唤醒拉活
+        getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_SERVICE_ENABLED, false)
+            .apply()
+
         updateCountdownUI()
         Toast.makeText(this, "护眼服务已停止", Toast.LENGTH_SHORT).show()
     }

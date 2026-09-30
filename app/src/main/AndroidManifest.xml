@@ -49,6 +49,21 @@
                 android:value="EyeCare 20-20-20 screen usage timer and overlay reminder" />
         </service>
 
+        <!-- 静态广播接收器：监听用户解锁屏幕 (ACTION_USER_PRESENT) 与系统开机，被杀后一解锁自动拉活服务 -->
+        <receiver
+            android:name=".BootAndUnlockReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <!-- 用户解锁手机屏幕（Google 官方隐式广播豁免清单） -->
+                <action android:name="android.intent.action.USER_PRESENT" />
+                <!-- 手机开机自启 -->
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <!-- 应用覆盖安装/升级完成 -->
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>

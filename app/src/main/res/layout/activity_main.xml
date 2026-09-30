@@ -1,44 +1,56 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    EyeCare 护眼助手主界面
+    单屏自适应紧凑布局：移除多余状态卡片、压缩设置按钮间距，确保一屏完整显示全部内容无滚动条
+-->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true"
+    android:scrollbars="none"
+    android:overScrollMode="never"
     android:background="#0F141C">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="20dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
         android:gravity="center_horizontal">
 
-        <!-- 应用标题 -->
+        <!-- 顶部标题区 (紧凑) -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/app_name"
             android:textColor="#FFFFFF"
-            android:textSize="22sp"
+            android:textSize="20sp"
             android:textStyle="bold"
-            android:layout_marginTop="16dp" />
+            android:layout_marginTop="2dp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="20-20-20 纯视觉护眼助手 (无声无震动)"
             android:textColor="#8896AA"
-            android:textSize="13sp"
-            android:layout_marginTop="4dp" />
+            android:textSize="12sp"
+            android:layout_marginTop="2dp" />
 
-        <!-- 核心：大字号使用时间倒计时看板 -->
+        <!-- 核心：大字号使用时间倒计时看板 (紧凑精简) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="#151E2B"
-            android:padding="20dp"
-            android:layout_marginTop="18dp"
-            android:layout_marginBottom="14dp"
+            android:paddingTop="12dp"
+            android:paddingBottom="12dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="8dp"
             android:gravity="center">
 
             <TextView
@@ -46,7 +58,7 @@
                 android:layout_height="wrap_content"
                 android:text="距离下次全屏远眺倒计时"
                 android:textColor="#8EA4C2"
-                android:textSize="13sp"
+                android:textSize="12sp"
                 android:textStyle="bold" />
 
             <!-- 大字号倒计时跳动展示 -->
@@ -56,12 +68,12 @@
                 android:layout_height="wrap_content"
                 android:text="20:00"
                 android:textColor="#38EF7D"
-                android:textSize="52sp"
+                android:textSize="44sp"
                 android:textStyle="bold"
                 android:fontFamily="sans-serif-medium"
                 android:includeFontPadding="false"
-                android:layout_marginTop="6dp"
-                android:layout_marginBottom="4dp" />
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="2dp" />
 
             <TextView
                 android:id="@+id/tvCountdownTip"
@@ -69,59 +81,43 @@
                 android:layout_height="wrap_content"
                 android:text="仅在亮屏使用时计时 · 黑屏自动挂起暂停"
                 android:textColor="#5E738E"
-                android:textSize="12sp" />
+                android:textSize="11sp" />
         </LinearLayout>
 
-        <!-- 状态监控展示卡片 -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:background="#1B2230"
-            android:padding="16dp"
-            android:layout_marginBottom="16dp">
-
-            <TextView
-                android:id="@+id/tvStatus"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textColor="#D5E0EE"
-                android:textSize="13sp"
-                android:lineSpacingExtra="5dp"
-                android:text="正在初始化状态..." />
-        </LinearLayout>
-
-        <!-- 国内机型后台遮罩权限配置卡片 -->
+        <!-- 国内机型后台遮罩权限配置卡片 (紧凑) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="#241E15"
-            android:padding="16dp"
-            android:layout_marginBottom="16dp">
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:layout_marginBottom="8dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="⚠️ 刷抖音无法弹出遮罩？必看设置"
                 android:textColor="#FFAA33"
-                android:textSize="13sp"
+                android:textSize="12sp"
                 android:textStyle="bold"
-                android:layout_marginBottom="6dp" />
+                android:layout_marginBottom="4dp" />
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="小米/vivo/OPPO/华为等机型默认禁止后台应用遮盖抖音。请点击下方按钮，务必开启【后台弹出界面】和【显示悬浮窗】权限，方可覆盖全屏抖音视频。"
+                android:text="小米/vivo/OPPO/华为等机型默认禁止后台覆盖抖音，请务必开启【后台弹出界面】和【显示悬浮窗】。"
                 android:textColor="#DCC6AF"
-                android:textSize="12sp"
-                android:lineSpacingExtra="3dp"
-                android:layout_marginBottom="10dp" />
+                android:textSize="11sp"
+                android:lineSpacingExtra="2dp"
+                android:layout_marginBottom="8dp" />
 
             <Button
                 android:id="@+id/btnOpenSpecialPermissions"
                 android:layout_width="match_parent"
-                android:layout_height="40dp"
+                android:layout_height="34dp"
                 android:text="前往开启【后台弹出界面】与悬浮窗"
                 android:textColor="#FFFFFF"
                 android:backgroundTint="#855214"
@@ -129,25 +125,68 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- 运行时间设置卡片 -->
+        <!-- 运行时间设置卡片 (高度大幅精简紧凑) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="#171E2B"
-            android:padding="16dp"
-            android:layout_marginBottom="16dp">
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:layout_marginBottom="8dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="运行时间设置 (亮屏累计触发周期)"
                 android:textColor="#FFFFFF"
-                android:textSize="14sp"
+                android:textSize="13sp"
                 android:textStyle="bold"
-                android:layout_marginBottom="10dp" />
+                android:layout_marginBottom="8dp" />
 
-            <!-- 第一排预设按钮 -->
+            <!-- 第一排预设按钮 (高度 34dp 紧凑排版) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="6dp">
+
+                <Button
+                    android:id="@+id/btnCycle10s"
+                    android:layout_width="0dp"
+                    android:layout_height="34dp"
+                    android:layout_weight="1"
+                    android:text="10秒(测试)"
+                    android:textColor="#8E9CAE"
+                    android:background="@drawable/bg_btn_preset_inactive"
+                    android:textSize="11sp"
+                    android:layout_marginEnd="6dp" />
+
+                <Button
+                    android:id="@+id/btnCycle10m"
+                    android:layout_width="0dp"
+                    android:layout_height="34dp"
+                    android:layout_weight="1"
+                    android:text="10分钟"
+                    android:textColor="#8E9CAE"
+                    android:background="@drawable/bg_btn_preset_inactive"
+                    android:textSize="11sp"
+                    android:layout_marginEnd="6dp" />
+
+                <Button
+                    android:id="@+id/btnCycle15m"
+                    android:layout_width="0dp"
+                    android:layout_height="34dp"
+                    android:layout_weight="1"
+                    android:text="15分钟"
+                    android:textColor="#8E9CAE"
+                    android:background="@drawable/bg_btn_preset_inactive"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <!-- 第二排预设按钮 (高度 34dp 紧凑排版) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -155,79 +194,39 @@
                 android:layout_marginBottom="8dp">
 
                 <Button
-                    android:id="@+id/btnCycle10s"
-                    android:layout_width="0dp"
-                    android:layout_height="42dp"
-                    android:layout_weight="1"
-                    android:text="10秒(测试)"
-                    android:textColor="#8E9CAE"
-                    android:background="@drawable/bg_btn_preset_inactive"
-                    android:textSize="12sp"
-                    android:layout_marginEnd="6dp" />
-
-                <Button
-                    android:id="@+id/btnCycle10m"
-                    android:layout_width="0dp"
-                    android:layout_height="42dp"
-                    android:layout_weight="1"
-                    android:text="10分钟"
-                    android:textColor="#8E9CAE"
-                    android:background="@drawable/bg_btn_preset_inactive"
-                    android:textSize="12sp"
-                    android:layout_marginEnd="6dp" />
-
-                <Button
-                    android:id="@+id/btnCycle15m"
-                    android:layout_width="0dp"
-                    android:layout_height="42dp"
-                    android:layout_weight="1"
-                    android:text="15分钟"
-                    android:textColor="#8E9CAE"
-                    android:background="@drawable/bg_btn_preset_inactive"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <!-- 第二排预设按钮 -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="14dp">
-
-                <Button
                     android:id="@+id/btnCycle20m"
                     android:layout_width="0dp"
-                    android:layout_height="42dp"
+                    android:layout_height="34dp"
                     android:layout_weight="1"
                     android:text="20分(推荐)"
                     android:textColor="#8E9CAE"
                     android:background="@drawable/bg_btn_preset_inactive"
-                    android:textSize="12sp"
+                    android:textSize="11sp"
                     android:layout_marginEnd="6dp" />
 
                 <Button
                     android:id="@+id/btnCycle30m"
                     android:layout_width="0dp"
-                    android:layout_height="42dp"
+                    android:layout_height="34dp"
                     android:layout_weight="1"
                     android:text="30分钟"
                     android:textColor="#8E9CAE"
                     android:background="@drawable/bg_btn_preset_inactive"
-                    android:textSize="12sp"
+                    android:textSize="11sp"
                     android:layout_marginEnd="6dp" />
 
                 <Button
                     android:id="@+id/btnCycle45m"
                     android:layout_width="0dp"
-                    android:layout_height="42dp"
+                    android:layout_height="34dp"
                     android:layout_weight="1"
                     android:text="45分钟"
                     android:textColor="#8E9CAE"
                     android:background="@drawable/bg_btn_preset_inactive"
-                    android:textSize="12sp" />
+                    android:textSize="11sp" />
             </LinearLayout>
 
-            <!-- 自定义时长输入 -->
+            <!-- 自定义时长输入行 (高度 36dp) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -237,78 +236,81 @@
                 <EditText
                     android:id="@+id/etCustomMinutes"
                     android:layout_width="0dp"
-                    android:layout_height="44dp"
+                    android:layout_height="36dp"
                     android:layout_weight="1"
                     android:hint="自定义分钟数 (如 25)"
                     android:textColorHint="#627084"
                     android:textColor="#FFFFFF"
                     android:background="#1F2838"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="12dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
                     android:inputType="number"
-                    android:textSize="13sp"
-                    android:layout_marginEnd="8dp" />
+                    android:textSize="12sp"
+                    android:layout_marginEnd="6dp" />
 
                 <Button
                     android:id="@+id/btnApplyCustomCycle"
                     android:layout_width="wrap_content"
-                    android:layout_height="44dp"
+                    android:layout_height="36dp"
                     android:text="应用"
                     android:textColor="#FFFFFF"
                     android:backgroundTint="#3B4C68"
-                    android:textSize="13sp" />
+                    android:textSize="12sp" />
             </LinearLayout>
         </LinearLayout>
 
-        <!-- 媒体播放联动设置卡片 -->
+        <!-- 媒体播放联动设置卡片 (高度紧凑) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="#171E2B"
-            android:padding="16dp"
-            android:layout_marginBottom="20dp">
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:layout_marginBottom="10dp">
 
             <Switch
                 android:id="@+id/switchPauseMedia"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="遮罩弹出时暂停音视频播放"
+                android:text="遮罩弹出时自动暂停音视频"
                 android:textColor="#FFFFFF"
-                android:textSize="14sp"
+                android:textSize="13sp"
                 android:textStyle="bold"
                 android:checked="true" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="刷抖音、快手或听音乐时自动暂停，20秒远眺结束后自动恢复播放"
+                android:text="刷抖音、快手等视频时自动暂停，远眺结束后恢复播放"
                 android:textColor="#8896AA"
-                android:textSize="12sp"
-                android:layout_marginTop="6dp" />
+                android:textSize="11sp"
+                android:layout_marginTop="2dp" />
         </LinearLayout>
 
-        <!-- 主控操作按钮 -->
+        <!-- 主控操作按钮 (紧凑) -->
         <Button
             android:id="@+id/btnToggleService"
             android:layout_width="match_parent"
-            android:layout_height="50dp"
+            android:layout_height="44dp"
             android:text="开启护眼守护"
             android:textColor="#051410"
             android:backgroundTint="#38EF7D"
             android:textStyle="bold"
-            android:textSize="15sp"
-            android:layout_marginBottom="10dp" />
+            android:textSize="14sp"
+            android:layout_marginBottom="8dp" />
 
         <Button
             android:id="@+id/btnTriggerTest"
             android:layout_width="match_parent"
-            android:layout_height="46dp"
+            android:layout_height="38dp"
             android:text="立即弹出遮罩测试 (20秒)"
             android:textColor="#E0E6F0"
             android:backgroundTint="#263144"
-            android:textSize="14sp"
-            android:layout_marginBottom="16dp" />
+            android:textSize="13sp"
+            android:layout_marginBottom="4dp" />
 
     </LinearLayout>
 </ScrollView>

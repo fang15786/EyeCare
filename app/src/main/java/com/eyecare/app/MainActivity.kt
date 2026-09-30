@@ -34,7 +34,6 @@ class MainActivity : Activity() {
     private lateinit var tvUsageCountdown: TextView
     private lateinit var tvCountdownTip: TextView
 
-    private lateinit var tvStatus: TextView
     private lateinit var btnToggleService: Button
     private lateinit var btnTriggerTest: Button
     private lateinit var btnOpenSpecialPermissions: Button
@@ -100,7 +99,6 @@ class MainActivity : Activity() {
     private fun initViews() {
         tvUsageCountdown = findViewById(R.id.tvUsageCountdown)
         tvCountdownTip = findViewById(R.id.tvCountdownTip)
-        tvStatus = findViewById(R.id.tvStatus)
         btnToggleService = findViewById(R.id.btnToggleService)
         btnTriggerTest = findViewById(R.id.btnTriggerTest)
         btnOpenSpecialPermissions = findViewById(R.id.btnOpenSpecialPermissions)
@@ -335,15 +333,6 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun formatCycleText(seconds: Int): String {
-        return if (seconds < 60) {
-            "${seconds} 秒 (测试)"
-        } else {
-            val mins = seconds / 60
-            "${mins} 分钟"
-        }
-    }
-
     /**
      * 实时刷新倒计时看板展示
      */
@@ -373,17 +362,6 @@ class MainActivity : Activity() {
     }
 
     private fun updateUI() {
-        val permGranted = hasOverlayPermission()
-        val cycleText = formatCycleText(selectedCycleSeconds)
-
-        tvStatus.text = buildString {
-            append("服务运行状态: ").append(if (isServiceRunning) "运行中\n" else "已停止\n")
-            append("当前设置周期: ").append(cycleText).append("\n")
-            append("音视频联动: ").append(if (isPauseMediaEnabled) "遮罩弹出自动暂停，关闭恢复\n" else "不打断播放\n")
-            append("悬浮窗权限: ").append(if (permGranted) "已授权\n" else "未授权 (启动将引导授权)\n")
-            append("提醒模式: 纯视觉静音 (无声音、无震动)")
-        }
-
         btnToggleService.text = if (isServiceRunning) "停止护眼守护" else "开启护眼守护"
     }
 

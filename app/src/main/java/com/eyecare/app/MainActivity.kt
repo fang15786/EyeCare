@@ -262,6 +262,11 @@ class MainActivity : Activity() {
         isServiceRunning = true
         updateCountdownUI()
         Toast.makeText(this, "护眼服务已启动", Toast.LENGTH_SHORT).show()
+
+        // 检查并引导加入电池优化白名单，防止后台休眠与冻结
+        if (!isIgnoringBatteryOptimizations()) {
+            requestIgnoreBatteryOptimizations()
+        }
     }
 
     /**
@@ -276,6 +281,37 @@ class MainActivity : Activity() {
         isServiceRunning = false
         updateCountdownUI()
         Toast.makeText(this, "护眼服务已停止", Toast.LENGTH_SHORT).show()
+    }
+
+    /**
+     * 检查是否已加入系统电池优化白名单（无限制后台运行）
+     */
+    private fun isIgnoringBatteryOptimizations(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+            powerManager?.isIgnoringBatteryOptimizations(packageName) ?: true
+        } else {
+            true
+        }
+    }
+
+    /**
+     * 引导申请忽略电池优化权限
+     */
+    private fun requestIgnoreBatteryOptimizations() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !isIgnoringBatteryOptimizations()) {
+            try {
+                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                    data = Uri.parse("package:$packageName")
+                }
+                startActivity(intent)
+            } catch (e: Exception) {
+                try {
+                    val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                    startActivity(intent)
+                } catch (ignored: Exception) {}
+            }
+        }
     }
 
     /**
@@ -314,7 +350,7 @@ class MainActivity : Activity() {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             startActivity(intent)
-            Toast.makeText(this, "请在设置中点击【权限管理】，开启【后台弹出界面】和【悬浮窗】", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "请在设置中开启【后台弹出界面】、【悬浮窗】与【省电策略无限制】", Toast.LENGTH_LONG).show()
         } catch (e: Exception) {
             // 降级尝试标准悬浮窗管理页
             requestOverlayPermission()

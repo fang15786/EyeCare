@@ -12,6 +12,9 @@
     <!-- 通知权限 (Android 13+)：用于在下拉通知栏显示前台常驻倒计时 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- 忽略电池优化权限：确保后台长效保活，防止锁屏被系统冻结挂起 -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <!-- 开机自启权限：可选自启动护眼保活 -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 

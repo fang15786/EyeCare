@@ -91,6 +91,44 @@
                 android:text="正在初始化状态..." />
         </LinearLayout>
 
+        <!-- 国内机型后台遮罩权限配置卡片 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#241E15"
+            android:padding="16dp"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⚠️ 刷抖音无法弹出遮罩？必看设置"
+                android:textColor="#FFAA33"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="6dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="小米/vivo/OPPO/华为等机型默认禁止后台应用遮盖抖音。请点击下方按钮，务必开启【后台弹出界面】和【显示悬浮窗】权限，方可覆盖全屏抖音视频。"
+                android:textColor="#DCC6AF"
+                android:textSize="12sp"
+                android:lineSpacingExtra="3dp"
+                android:layout_marginBottom="10dp" />
+
+            <Button
+                android:id="@+id/btnOpenSpecialPermissions"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:text="前往开启【后台弹出界面】与悬浮窗"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#855214"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
         <!-- 运行时间设置卡片 -->
         <LinearLayout
             android:layout_width="match_parent"

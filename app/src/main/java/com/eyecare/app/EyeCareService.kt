@@ -242,7 +242,8 @@ class EyeCareService : Service() {
 
     /**
      * 弹出全屏半透明悬浮遮罩并启动 20 秒倒计时
-     * 依赖纯视觉引导，无声音、无任何震动
+     * 1. 采用 Android 12+ 官方规范的 createWindowContext 获取全局系统级顶级窗口令牌；
+     * 2. 注入 FLAG_SHOW_WHEN_LOCKED、FLAG_HARDWARE_ACCELERATED 与刘海屏切区适配，强制穿透并置顶覆盖在抖音等沉浸式全屏画面上方。
      */
     private fun showEyeCareOverlay() {
         if (isOverlayShowing) return
@@ -254,8 +255,18 @@ class EyeCareService : Service() {
         }
 
         try {
+            // 在 Android 12 (API 31)+ 上创建具有系统顶级浮窗令牌的 WindowContext
+            val windowContext = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                createWindowContext(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null)
+            } else {
+                this
+            }
+
+            val wm = windowContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            windowManager = wm
+
             // 加载全屏遮罩视图
-            val inflater = LayoutInflater.from(this)
+            val inflater = LayoutInflater.from(windowContext)
             val view = inflater.inflate(R.layout.overlay_eye_care, null)
             overlayView = view
 
@@ -273,14 +284,20 @@ class EyeCareService : Service() {
                 layoutParamsType,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                         WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                        WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                        WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                 PixelFormat.TRANSLUCENT
             ).apply {
                 gravity = Gravity.CENTER
+                // 彻底延展至全屏幕边缘（包括刘海与挖孔区域），确保无死角覆盖抖音等全屏应用
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                }
             }
 
             // 添加全屏视图到 WindowManager
-            windowManager?.addView(view, params)
+            wm.addView(view, params)
             isOverlayShowing = true
 
             // 请求瞬态音频焦点以暂停外部音视频播放（如抖音等）

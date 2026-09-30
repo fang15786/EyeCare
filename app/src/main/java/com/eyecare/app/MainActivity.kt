@@ -37,6 +37,7 @@ class MainActivity : Activity() {
     private lateinit var tvStatus: TextView
     private lateinit var btnToggleService: Button
     private lateinit var btnTriggerTest: Button
+    private lateinit var btnOpenSpecialPermissions: Button
 
     // 运行时间预设按钮
     private lateinit var btnCycle10s: Button
@@ -102,6 +103,12 @@ class MainActivity : Activity() {
         tvStatus = findViewById(R.id.tvStatus)
         btnToggleService = findViewById(R.id.btnToggleService)
         btnTriggerTest = findViewById(R.id.btnTriggerTest)
+        btnOpenSpecialPermissions = findViewById(R.id.btnOpenSpecialPermissions)
+
+        // 绑定跳转系统权限设置页
+        btnOpenSpecialPermissions.setOnClickListener {
+            openSpecialPermissionSettings()
+        }
 
         btnCycle10s = findViewById(R.id.btnCycle10s)
         btnCycle10m = findViewById(R.id.btnCycle10m)
@@ -295,6 +302,24 @@ class MainActivity : Activity() {
                 Uri.parse("package:$packageName")
             )
             startActivityForResult(intent, REQUEST_CODE_OVERLAY_PERMISSION)
+        }
+    }
+
+    /**
+     * 打开系统应用权限设置页（重点引导小米/vivo/OPPO/华为用户开启“后台弹出界面”和“悬浮窗”）
+     */
+    private fun openSpecialPermissionSettings() {
+        try {
+            // 优先打开当前应用的应用详情权限页
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", packageName, null)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+            Toast.makeText(this, "请在设置中点击【权限管理】，开启【后台弹出界面】和【悬浮窗】", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            // 降级尝试标准悬浮窗管理页
+            requestOverlayPermission()
         }
     }
 

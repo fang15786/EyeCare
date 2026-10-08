@@ -102,6 +102,46 @@ class EyeCareService : Service() {
     private var lastScreenOnTimestamp = 0L
     private var lastNotificationRemainingSeconds = -1
 
+    // 唤醒锁：确保在亮屏使用手机期间，后台进程不被 Linux 内核的 cgroup freezer 冻结挂起
+    private var wakeLock: PowerManager.WakeLock? = null
+
+    /**
+     * 在屏幕点亮且用户使用中时获取 PARTIAL_WAKE_LOCK
+     * 核心机制：Android 内核进程优化器（CachedAppOptimizer）对持有 WakeLock 的进程实行绝对豁免，
+     * 彻底杜绝应用在切出后台后被内核直接冻结挂起（freezer.state = FROZEN），保障 20 分钟倒计时如期弹出
+     */
+    private fun acquireScreenWakeLock() {
+        if (wakeLock == null) {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            wakeLock = powerManager?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "EyeCare::ScreenOnTimerWakeLock")?.apply {
+                setReferenceCounted(false)
+            }
+        }
+        try {
+            if (wakeLock?.isHeld == false) {
+                wakeLock?.acquire()
+                Log.d(TAG, "已获取 PARTIAL_WAKE_LOCK，保障亮屏期间后台主循环不被内核冻结挂起")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "获取 WakeLock 异常: ${e.message}")
+        }
+    }
+
+    /**
+     * 在屏幕熄灭/锁屏或服务停止时释放 PARTIAL_WAKE_LOCK
+     * 核心机制：熄屏后立即归还 CPU 控制权，允许设备正常进入深度休眠，杜绝无意义耗电
+     */
+    private fun releaseScreenWakeLock() {
+        try {
+            if (wakeLock?.isHeld == true) {
+                wakeLock?.release()
+                Log.d(TAG, "已释放 PARTIAL_WAKE_LOCK，允许系统正常深度休眠")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "释放 WakeLock 异常: ${e.message}")
+        }
+    }
+
     // 计时主循环 Handler
     private val mainHandler = Handler(Looper.getMainLooper())
     private val timerRunnable = object : Runnable {
@@ -113,11 +153,15 @@ class EyeCareService : Service() {
             // 同步内部状态
             isScreenOn = isInteractive
 
-            // 若屏幕处于熄灭/锁屏非交互状态，立即挂起并退出计时主循环，杜绝无意义空转与损耗
+            // 若屏幕处于熄灭/锁屏非交互状态，立即挂起并退出计时主循环，释放唤醒锁
             if (!isInteractive) {
                 Log.d(TAG, "当前屏幕处于熄灭/锁屏非交互状态，主计时循环挂起")
+                releaseScreenWakeLock()
                 return
             }
+
+            // 亮屏使用中，确保持有唤醒锁保障后台主线程免受内核冻结
+            acquireScreenWakeLock()
 
             if (!isOverlayShowing) {
                 val now = SystemClock.elapsedRealtime()
@@ -161,16 +205,17 @@ class EyeCareService : Service() {
             val now = SystemClock.elapsedRealtime()
             when (intent?.action) {
                 Intent.ACTION_SCREEN_ON -> {
-                    Log.d(TAG, "检测到屏幕点亮：校准时间基准点并恢复主计时循环")
+                    Log.d(TAG, "检测到屏幕点亮：校准时间基准点、获取唤醒锁并恢复主计时循环")
                     val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
                     isScreenOn = powerManager?.isInteractive ?: true
                     lastScreenOnTimestamp = now
+                    acquireScreenWakeLock()
                     // 恢复主计时循环
                     mainHandler.removeCallbacks(timerRunnable)
                     mainHandler.post(timerRunnable)
                 }
                 Intent.ACTION_SCREEN_OFF -> {
-                    Log.d(TAG, "检测到屏幕熄灭/锁屏：结算尾随秒数并暂停主计时循环")
+                    Log.d(TAG, "检测到屏幕熄灭/锁屏：结算尾随秒数、释放唤醒锁并暂停主计时循环")
                     // 在完全熄屏前，结算未满心跳周期的真实流逝秒数，防止熄屏边缘时间丢失
                     if (isScreenOn && !isOverlayShowing) {
                         val deltaMillis = now - lastScreenOnTimestamp
@@ -182,13 +227,15 @@ class EyeCareService : Service() {
                     isScreenOn = false
                     lastScreenOnTimestamp = now
                     saveAccumulatedTime()
-                    // 彻底停止主计时循环，杜绝黑屏期间无意义空转与耗电
+                    // 彻底停止主计时循环并释放 WakeLock，杜绝黑屏期间无意义空转与耗电
                     mainHandler.removeCallbacks(timerRunnable)
+                    releaseScreenWakeLock()
                 }
                 Intent.ACTION_USER_PRESENT -> {
-                    Log.d(TAG, "检测到用户解锁手机：确认亮屏使用中并恢复计时")
+                    Log.d(TAG, "检测到用户解锁手机：确认亮屏使用中、获取唤醒锁并恢复计时")
                     isScreenOn = true
                     lastScreenOnTimestamp = now
+                    acquireScreenWakeLock()
                     mainHandler.removeCallbacks(timerRunnable)
                     mainHandler.post(timerRunnable)
                 }
@@ -220,10 +267,13 @@ class EyeCareService : Service() {
         val notification = buildSilentNotification(initialContent)
         startForeground(NOTIFICATION_ID, notification)
 
-        // 检测初始屏幕亮灭状态并初始化时间戳
+        // 检测初始屏幕亮灭状态并初始化时间戳与唤醒锁
         val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
         isScreenOn = powerManager?.isInteractive ?: true
         lastScreenOnTimestamp = SystemClock.elapsedRealtime()
+        if (isScreenOn) {
+            acquireScreenWakeLock()
+        }
 
         // 注册屏幕开闭与用户解锁广播
         val filter = IntentFilter().apply {
@@ -245,8 +295,9 @@ class EyeCareService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
-                // 用户主动点击停止护眼，记录持久化状态，防止解锁屏幕时误拉活
+                // 用户主动点击停止护眼，记录持久化状态，释放唤醒锁，防止解锁屏幕时误拉活
                 setServiceEnabledPref(false)
+                releaseScreenWakeLock()
                 stopSelf()
                 return START_NOT_STICKY
             }
@@ -283,10 +334,11 @@ class EyeCareService : Service() {
                     isPauseMediaEnabled = intent.getBooleanExtra(EXTRA_PAUSE_MEDIA, true)
                 }
 
-                // 确保在亮屏状态下计时循环立即就绪
+                // 确保在亮屏状态下持有唤醒锁并启动计时循环
                 val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
                 isScreenOn = powerManager?.isInteractive ?: true
                 if (isScreenOn) {
+                    acquireScreenWakeLock()
                     mainHandler.removeCallbacks(timerRunnable)
                     mainHandler.post(timerRunnable)
                 }
@@ -416,8 +468,9 @@ class EyeCareService : Service() {
         lastNotificationRemainingSeconds = -1
         checkAndUpdateNotification(currentRemainingSeconds)
 
-        // 确保下一轮远眺倒计时循环即刻恢复运转
+        // 确保下一轮远眺倒计时循环即刻恢复运转并持有唤醒锁
         if (isRunning && isScreenOn) {
+            acquireScreenWakeLock()
             mainHandler.removeCallbacks(timerRunnable)
             mainHandler.post(timerRunnable)
         }
@@ -534,8 +587,10 @@ class EyeCareService : Service() {
             } catch (ignored: Exception) {}
         }
 
-        // 确保服务销毁时释放音频焦点
+        // 确保服务销毁时释放音频焦点与唤醒锁
         abandonMediaPause()
+        releaseScreenWakeLock()
+        wakeLock = null
 
         Log.i(TAG, "EyeCare 护眼服务已停止")
     }

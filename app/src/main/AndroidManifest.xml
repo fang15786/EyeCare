@@ -18,6 +18,9 @@
     <!-- 开机自启权限：可选自启动护眼保活 -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- 唤醒锁权限：确保在亮屏使用期间防止进程被系统内核 Freezer 冻结挂起，锁屏时自动释放 -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <!-- 注意：根据纯视觉静默需求，本应用坚决不申请 android.permission.VIBRATE 权限，无任何震动与声音 -->
 
     <application

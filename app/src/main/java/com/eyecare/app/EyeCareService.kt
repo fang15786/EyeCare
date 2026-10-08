@@ -113,22 +113,23 @@ class EyeCareService : Service() {
             // 同步内部状态
             isScreenOn = isInteractive
 
-            if (isInteractive && !isOverlayShowing) {
+            // 若屏幕处于熄灭/锁屏非交互状态，立即挂起并退出计时主循环，杜绝无意义空转与损耗
+            if (!isInteractive) {
+                Log.d(TAG, "当前屏幕处于熄灭/锁屏非交互状态，主计时循环挂起")
+                return
+            }
+
+            if (!isOverlayShowing) {
                 val now = SystemClock.elapsedRealtime()
                 val deltaMillis = now - lastScreenOnTimestamp
 
-                // 防时间膨胀机制：
-                // 正常轮询周期在 1000ms 左右。若由于灭屏休眠、系统冻结等导致 deltaMillis 异常过大（> 3000ms），
-                // 严禁将大段黑屏休眠时长当作亮屏使用时间吞并，直接限制步长或对齐时间戳。
-                if (deltaMillis in 1000..3000) {
+                // 核心修复：全额折算真实流逝秒数，彻底解决系统后台降频导致使用时长被大量丢弃的严重缺陷
+                // 只要当前处于亮屏交互状态，无论后台被系统批处理延迟 1 秒、5 秒还是 10 秒唤醒，
+                // 所有整秒差值（deltaSeconds）均全额计入累计亮屏时长，零丢失！
+                if (deltaMillis >= 1000) {
                     val deltaSeconds = (deltaMillis / 1000).toInt()
                     accumulatedScreenSeconds += deltaSeconds
                     lastScreenOnTimestamp += deltaSeconds * 1000L
-                    saveAccumulatedTime()
-                } else if (deltaMillis > 3000) {
-                    // 经历了系统深度休眠、黑屏恢复或进程唤醒：仅计入 1 秒心跳，并将基准对齐当前时刻，杜绝黑屏时长被瞬间累加
-                    accumulatedScreenSeconds += 1
-                    lastScreenOnTimestamp = now
                     saveAccumulatedTime()
                 }
 
@@ -143,11 +144,14 @@ class EyeCareService : Service() {
                     showEyeCareOverlay()
                 }
             } else {
-                // 当屏幕处于非交互状态（黑屏/锁屏）或正在展示遮罩时，持续将时间基准点校准为当前时刻，防止恢复亮屏时产生巨大的历史时钟差
+                // 当正在展示遮罩时，持续将时间基准点校准为当前时刻，防止遮罩关闭后产生时钟差
                 lastScreenOnTimestamp = SystemClock.elapsedRealtime()
             }
-            // 每秒轮询校准
-            mainHandler.postDelayed(this, 1000)
+
+            // 仅在服务运行中且屏幕点亮时继续派发下一次校准轮询
+            if (isRunning && isScreenOn) {
+                mainHandler.postDelayed(this, 1000)
+            }
         }
     }
 
@@ -157,21 +161,36 @@ class EyeCareService : Service() {
             val now = SystemClock.elapsedRealtime()
             when (intent?.action) {
                 Intent.ACTION_SCREEN_ON -> {
-                    Log.d(TAG, "检测到屏幕点亮：重置时间基准点")
+                    Log.d(TAG, "检测到屏幕点亮：校准时间基准点并恢复主计时循环")
                     val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
                     isScreenOn = powerManager?.isInteractive ?: true
                     lastScreenOnTimestamp = now
+                    // 恢复主计时循环
+                    mainHandler.removeCallbacks(timerRunnable)
+                    mainHandler.post(timerRunnable)
                 }
                 Intent.ACTION_SCREEN_OFF -> {
-                    Log.d(TAG, "检测到屏幕熄灭/锁屏：暂停计时并校准时间基准点")
+                    Log.d(TAG, "检测到屏幕熄灭/锁屏：结算尾随秒数并暂停主计时循环")
+                    // 在完全熄屏前，结算未满心跳周期的真实流逝秒数，防止熄屏边缘时间丢失
+                    if (isScreenOn && !isOverlayShowing) {
+                        val deltaMillis = now - lastScreenOnTimestamp
+                        if (deltaMillis >= 1000) {
+                            val deltaSeconds = (deltaMillis / 1000).toInt()
+                            accumulatedScreenSeconds += deltaSeconds
+                        }
+                    }
                     isScreenOn = false
                     lastScreenOnTimestamp = now
                     saveAccumulatedTime()
+                    // 彻底停止主计时循环，杜绝黑屏期间无意义空转与耗电
+                    mainHandler.removeCallbacks(timerRunnable)
                 }
                 Intent.ACTION_USER_PRESENT -> {
-                    Log.d(TAG, "检测到用户解锁手机：确认亮屏使用中")
+                    Log.d(TAG, "检测到用户解锁手机：确认亮屏使用中并恢复计时")
                     isScreenOn = true
                     lastScreenOnTimestamp = now
+                    mainHandler.removeCallbacks(timerRunnable)
+                    mainHandler.post(timerRunnable)
                 }
             }
         }
@@ -262,6 +281,14 @@ class EyeCareService : Service() {
 
                 if (intent != null && intent.hasExtra(EXTRA_PAUSE_MEDIA)) {
                     isPauseMediaEnabled = intent.getBooleanExtra(EXTRA_PAUSE_MEDIA, true)
+                }
+
+                // 确保在亮屏状态下计时循环立即就绪
+                val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+                isScreenOn = powerManager?.isInteractive ?: true
+                if (isScreenOn) {
+                    mainHandler.removeCallbacks(timerRunnable)
+                    mainHandler.post(timerRunnable)
                 }
 
                 Log.d(TAG, "已更新配置: 运行周期=${currentWorkCycleSeconds}秒, 剩余倒计时=${currentRemainingSeconds}秒")
@@ -388,6 +415,12 @@ class EyeCareService : Service() {
         currentRemainingSeconds = currentWorkCycleSeconds
         lastNotificationRemainingSeconds = -1
         checkAndUpdateNotification(currentRemainingSeconds)
+
+        // 确保下一轮远眺倒计时循环即刻恢复运转
+        if (isRunning && isScreenOn) {
+            mainHandler.removeCallbacks(timerRunnable)
+            mainHandler.post(timerRunnable)
+        }
         Log.i(TAG, "本轮远眺结束，遮罩已自动移除，重置计时并静默进入下一轮循环")
     }
 

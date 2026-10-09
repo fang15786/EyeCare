@@ -90,6 +90,7 @@ class EyeCareService : Service() {
 
     // WindowManager 与悬浮窗视图
     private var windowManager: WindowManager? = null
+    private var overlayContext: Context? = null
     private var overlayView: View? = null
     private var countDownTimer: CountDownTimer? = null
 
@@ -117,9 +118,42 @@ class EyeCareService : Service() {
     private var exactAlarmPendingIntent: PendingIntent? = null
 
     /**
-     * 规划底层硬件 RTC 准时闹钟 (AlarmManager.setExactAndAllowWhileIdle)
-     * 核心作用：当手机在运行重度游戏或后台 Handler 批处理被系统降频时，
-     * 硬件闹钟直接在硬件中断级别准时唤醒系统派发广播，彻底解决后台时间到了不弹窗的问题。
+     * 获取用于弹出全局悬浮遮罩的专用 Context
+     * Android 12+ (API 31+) 优先使用单例缓存的 createWindowContext，兼顾 Display 关联与避免重复创建泄露
+     */
+    private fun getOverlayContext(): Context {
+        if (overlayContext == null) {
+            overlayContext = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                try {
+                    createWindowContext(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null)
+                } catch (e: Exception) {
+                    Log.w(TAG, "创建 WindowContext 异常，回退使用 Service: ${e.message}")
+                    this
+                }
+            } else {
+                this
+            }
+        }
+        return overlayContext ?: this
+    }
+
+    /**
+     * 获取用于悬浮窗挂载的 WindowManager 实例
+     */
+    private fun getOverlayWindowManager(): WindowManager {
+        val ctx = getOverlayContext()
+        val wm = (ctx.getSystemService(Context.WINDOW_SERVICE) as? WindowManager)
+            ?: (getSystemService(Context.WINDOW_SERVICE) as WindowManager)
+        windowManager = wm
+        return wm
+    }
+
+    /**
+     * 规划底层硬件 RTC 准时闹钟 (优先使用最高优先级 AlarmManager.setAlarmClock)
+     * 核心机制：
+     * 1. 采用 Android 拥有最高特权的 setAlarmClock，该接口专为用户感知型倒计时与闹钟设计；
+     * 2. 完全豁免 Doze 深度休眠节流与 9~15 分钟批处理合并限制，确保第二轮及后续每一轮均准时唤醒；
+     * 3. 在硬件芯片中断级别直接唤醒系统派发广播，彻底解决后台玩大型游戏或进程降频导致不弹窗的问题。
      * @param remainingSeconds 距离下一次远眺触发的剩余秒数
      */
     private fun scheduleHardwareExactAlarm(remainingSeconds: Int) {
@@ -130,7 +164,7 @@ class EyeCareService : Service() {
             }
             val am = alarmManager ?: return
 
-            // 取消先前的闹钟
+            // 仅取消先前注册的硬件调度，严禁作废 PendingIntent 自身凭据
             cancelHardwareExactAlarm()
 
             val intent = Intent(this, EyeCareAlarmReceiver::class.java).apply {
@@ -143,39 +177,53 @@ class EyeCareService : Service() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            val triggerAtMillis = SystemClock.elapsedRealtime() + remainingSeconds * 1000L
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            // 优先使用最高特权的 setAlarmClock (豁免一切 Doze 节流与批处理合并限制)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                val triggerAtWallMillis = System.currentTimeMillis() + remainingSeconds * 1000L
+                val showIntent = Intent(this, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                }
+                val showPendingIntent = PendingIntent.getActivity(
+                    this,
+                    1,
+                    showIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                val alarmClockInfo = AlarmManager.AlarmClockInfo(triggerAtWallMillis, showPendingIntent)
+                am.setAlarmClock(alarmClockInfo, exactAlarmPendingIntent!!)
+                Log.d(TAG, "已向底层硬件 RTC 注册最高优先级 setAlarmClock 闹钟，将在 ${remainingSeconds} 秒后准时唤醒触发遮罩")
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val triggerAtElapsedMillis = SystemClock.elapsedRealtime() + remainingSeconds * 1000L
                 am.setExactAndAllowWhileIdle(
                     AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                    triggerAtMillis,
+                    triggerAtElapsedMillis,
                     exactAlarmPendingIntent!!
                 )
             } else {
+                val triggerAtElapsedMillis = SystemClock.elapsedRealtime() + remainingSeconds * 1000L
                 am.setExact(
                     AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                    triggerAtMillis,
+                    triggerAtElapsedMillis,
                     exactAlarmPendingIntent!!
                 )
             }
-            Log.d(TAG, "已向底层硬件 RTC 注册精确定时闹钟，将在 ${remainingSeconds} 秒后准时唤醒触发遮罩")
         } catch (e: Exception) {
             Log.w(TAG, "注册硬件 RTC 闹钟异常: ${e.message}")
         }
     }
 
     /**
-     * 屏幕熄灭、遮罩弹出或服务停止时，及时取消硬件闹钟，杜绝黑屏期间误唤醒
+     * 屏幕熄灭、遮罩弹出或服务停止时，及时取消硬件闹钟调度
+     * 关键规范：仅调用 alarmManager.cancel() 撤销系统调度，严禁调用 pendingIntent.cancel()！
+     * 若调用 pendingIntent.cancel() 会导致底层的 IntentSender 被永久废弃，导致第二轮及后续无法重新注册。
      */
     private fun cancelHardwareExactAlarm() {
         try {
             exactAlarmPendingIntent?.let {
                 alarmManager?.cancel(it)
-                it.cancel()
             }
-            exactAlarmPendingIntent = null
         } catch (e: Exception) {
-            Log.w(TAG, "取消硬件 RTC 闹钟异常: ${e.message}")
+            Log.w(TAG, "取消硬件 RTC 闹钟调度异常: ${e.message}")
         }
     }
 
@@ -320,10 +368,29 @@ class EyeCareService : Service() {
         }
     }
 
+    /**
+     * 确保前台服务契约已履约并刷新通知
+     * 核心作用：不论通过 startForegroundService、系统重启还是闹钟广播唤醒，必须立即履约前台声明，
+     * 彻底杜绝因 5 秒未调用 startForeground 被系统抛出 ForegroundServiceDidNotStartInTimeException 强杀。
+     */
+    private fun ensureForegroundRunning() {
+        val initialContent = formatCountdownText(currentRemainingSeconds)
+        val notification = buildSilentNotification(initialContent)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "履约 startForeground 声明异常: ${e.message}")
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         isRunning = true
-        windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        windowManager = getOverlayWindowManager()
 
         // 从持久化偏好载入用户配置
         loadPreferences()
@@ -338,15 +405,9 @@ class EyeCareService : Service() {
         }
         currentRemainingSeconds = (currentWorkCycleSeconds - accumulatedScreenSeconds).coerceAtLeast(0)
 
-        // 创建低优先级纯静默前台通知（实时展示使用倒计时）
+        // 创建低优先级纯静默前台通知渠道并立即启动前台服务
         createSilentNotificationChannel()
-        val initialContent = formatCountdownText(currentRemainingSeconds)
-        val notification = buildSilentNotification(initialContent)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
-        }
+        ensureForegroundRunning()
 
         // 检测初始屏幕亮灭状态并初始化时间戳、唤醒锁与硬件闹钟
         val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
@@ -375,7 +436,28 @@ class EyeCareService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
+        // 关键保活履约：不论通过 startForegroundService、系统重启还是闹钟广播调起，
+        // 必须在入口第一毫秒无条件履约 startForeground，彻底杜绝 5 秒未履约被系统强杀！
+        ensureForegroundRunning()
+
+        if (intent == null) {
+            // 系统内存紧张杀进程后自动通过 START_STICKY 重启拉起
+            Log.i(TAG, "服务由系统自动恢复重启 (intent=null)，重新校准基准点并启动计时")
+            loadPreferences()
+            configuredCycleSeconds = currentWorkCycleSeconds
+            val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            isScreenOn = powerManager?.isInteractive ?: true
+            lastScreenOnTimestamp = SystemClock.elapsedRealtime()
+            if (isScreenOn) {
+                acquireScreenWakeLock()
+                scheduleHardwareExactAlarm(currentRemainingSeconds)
+                mainHandler.removeCallbacks(timerRunnable)
+                mainHandler.post(timerRunnable)
+            }
+            return START_STICKY
+        }
+
+        when (intent.action) {
             ACTION_STOP -> {
                 // 用户主动点击停止护眼，记录持久化状态，释放唤醒锁与硬件闹钟，防止解锁屏幕时误拉活
                 setServiceEnabledPref(false)
@@ -401,8 +483,8 @@ class EyeCareService : Service() {
                 // 用户主动启动或更新配置，记录持久化状态为已启用
                 setServiceEnabledPref(true)
                 // 动态更新配置（支持自定义运行时间与媒体暂停开关）
-                val customCycle = intent?.getIntExtra(EXTRA_WORK_CYCLE_SECONDS, -1) ?: -1
-                val legacyTestCycle = intent?.getIntExtra(EXTRA_TEST_CYCLE_SECONDS, -1) ?: -1
+                val customCycle = intent.getIntExtra(EXTRA_WORK_CYCLE_SECONDS, -1)
+                val legacyTestCycle = intent.getIntExtra(EXTRA_TEST_CYCLE_SECONDS, -1)
 
                 if (customCycle > 0) {
                     currentWorkCycleSeconds = customCycle
@@ -422,7 +504,7 @@ class EyeCareService : Service() {
                 lastNotificationRemainingSeconds = -1
                 checkAndUpdateNotification(currentRemainingSeconds)
 
-                if (intent != null && intent.hasExtra(EXTRA_PAUSE_MEDIA)) {
+                if (intent.hasExtra(EXTRA_PAUSE_MEDIA)) {
                     isPauseMediaEnabled = intent.getBooleanExtra(EXTRA_PAUSE_MEDIA, true)
                 }
 
@@ -462,31 +544,19 @@ class EyeCareService : Service() {
         cancelHardwareExactAlarm()
 
         try {
+            val wm = getOverlayWindowManager()
+            val ctx = getOverlayContext()
+
             // 防重复保护：若先前的 View 尚未清理，先安全移除
             if (overlayView != null) {
                 try {
-                    windowManager?.removeView(overlayView)
+                    wm.removeView(overlayView)
                 } catch (ignored: Exception) {}
                 overlayView = null
             }
 
-            // 针对 Android 12+ (API 31+)，优先使用 createWindowContext 关联 Default Display，规避 Context 缺失 Display 异常
-            val windowContext = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                try {
-                    createWindowContext(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null)
-                } catch (e: Exception) {
-                    this
-                }
-            } else {
-                this
-            }
-
-            // 获取系统 WindowManager
-            val wm = windowContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-            windowManager = wm
-
             // 加载全屏遮罩视图
-            val inflater = LayoutInflater.from(windowContext)
+            val inflater = LayoutInflater.from(ctx)
             val view = inflater.inflate(R.layout.overlay_eye_care, null)
             overlayView = view
 
@@ -606,7 +676,7 @@ class EyeCareService : Service() {
     }
 
     /**
-     * 销毁全屏悬浮遮罩，重置累计亮屏时间，静默开启下一轮 20 分钟循环
+     * 销毁全屏悬浮遮罩，重置累计亮屏时间，静默开启下一轮循环
      */
     private fun dismissOverlayAndResetCycle() {
         countDownTimer?.cancel()
@@ -614,7 +684,7 @@ class EyeCareService : Service() {
 
         overlayView?.let { view ->
             try {
-                windowManager?.removeView(view)
+                getOverlayWindowManager().removeView(view)
             } catch (e: Exception) {
                 Log.e(TAG, "移除悬浮窗视图异常: ${e.message}")
             }
@@ -630,6 +700,10 @@ class EyeCareService : Service() {
             val notificationManager = getSystemService(NotificationManager::class.java)
             notificationManager?.cancel(HIGH_PRIORITY_NOTIFICATION_ID)
         } catch (ignored: Exception) {}
+
+        // 权威校准屏幕当前交互状态
+        val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+        isScreenOn = powerManager?.isInteractive ?: isScreenOn
 
         // 清零累计亮屏秒数，开启下一轮静默循环
         accumulatedScreenSeconds = 0
@@ -752,8 +826,10 @@ class EyeCareService : Service() {
         mainHandler.removeCallbacks(timerRunnable)
         countDownTimer?.cancel()
 
-        // 取消硬件闹钟
+        // 取消硬件闹钟并彻底释放凭据
         cancelHardwareExactAlarm()
+        exactAlarmPendingIntent?.cancel()
+        exactAlarmPendingIntent = null
         alarmManager = null
 
         // 清理降级通知
@@ -765,9 +841,10 @@ class EyeCareService : Service() {
         // 移除悬浮窗
         overlayView?.let { view ->
             try {
-                windowManager?.removeView(view)
+                getOverlayWindowManager().removeView(view)
             } catch (ignored: Exception) {}
         }
+        overlayContext = null
 
         // 确保服务销毁时释放音频焦点与唤醒锁
         abandonMediaPause()

@@ -84,12 +84,13 @@
                 android:textSize="11sp" />
         </LinearLayout>
 
-        <!-- 国内机型后台遮罩权限配置卡片 (紧凑) -->
+        <!-- 国内机型后台遮罩权限配置卡片 (动态警示与直达引导) -->
         <LinearLayout
+            android:id="@+id/layoutPermissionCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="#241E15"
+            android:background="#2E1C15"
             android:paddingTop="10dp"
             android:paddingBottom="10dp"
             android:paddingStart="12dp"
@@ -97,19 +98,21 @@
             android:layout_marginBottom="8dp">
 
             <TextView
+                android:id="@+id/tvPermissionTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="⚠️ 刷抖音无法弹出遮罩？必看设置"
+                android:text="⚠️ 关键权限检测中..."
                 android:textColor="#FFAA33"
                 android:textSize="12sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="4dp" />
 
             <TextView
+                android:id="@+id/tvPermissionDesc"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="小米/vivo/OPPO/华为等机型默认禁止后台覆盖抖音，请务必开启【后台弹出界面】和【显示悬浮窗】。"
-                android:textColor="#DCC6AF"
+                android:text="小米/vivo/OPPO等机型默认禁止后台弹出界面。若未开启，切出后台玩游戏时间到了绝不会弹窗，只有主动点回本应用才会弹出！"
+                android:textColor="#E0C8B8"
                 android:textSize="11sp"
                 android:lineSpacingExtra="2dp"
                 android:layout_marginBottom="8dp" />
@@ -118,9 +121,9 @@
                 android:id="@+id/btnOpenSpecialPermissions"
                 android:layout_width="match_parent"
                 android:layout_height="34dp"
-                android:text="前往开启【后台弹出界面】与悬浮窗"
+                android:text="一键前往开启【后台弹出界面】与悬浮窗"
                 android:textColor="#FFFFFF"
-                android:backgroundTint="#855214"
+                android:backgroundTint="#A85215"
                 android:textSize="12sp"
                 android:textStyle="bold" />
         </LinearLayout>

@@ -21,6 +21,13 @@
     <!-- 唤醒锁权限：确保在亮屏使用期间防止进程被系统内核 Freezer 冻结挂起，锁屏时自动释放 -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- 硬件级精确闹钟权限：确保 10/20 分钟倒计时到期时由系统底层硬件 RTC 准时唤醒触发，杜绝游戏/后台降频延迟 -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
+    <!-- 全屏意图横幅通知权限：当厂商系统在极端场景下拦截底层悬浮窗时，以最高优先级全屏通知横幅兜底提醒 -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
     <!-- 注意：根据纯视觉静默需求，本应用坚决不申请 android.permission.VIBRATE 权限，无任何震动与声音 -->
 
     <application
@@ -64,6 +71,16 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <!-- 应用覆盖安装/升级完成 -->
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 硬件精确闹钟接收器：监听 RTC 闹钟到期唤醒广播，触发远眺遮罩 -->
+        <receiver
+            android:name=".EyeCareAlarmReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.eyecare.app.ACTION_EXACT_ALARM_TRIGGER" />
             </intent-filter>
         </receiver>
 

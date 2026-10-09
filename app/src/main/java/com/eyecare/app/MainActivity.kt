@@ -1,6 +1,8 @@
 package com.eyecare.app
 
 import android.app.Activity
+import android.app.AlertDialog
+import android.app.AppOpsManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
@@ -11,8 +13,10 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.util.Log
 import android.widget.Button
 import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
@@ -24,6 +28,7 @@ import android.widget.Toast
 class MainActivity : Activity() {
 
     companion object {
+        private const val TAG = "MainActivity"
         private const val REQUEST_CODE_OVERLAY_PERMISSION = 1001
         private const val PREFS_NAME = EyeCareService.PREFS_NAME
         private const val KEY_WORK_CYCLE_SECONDS = EyeCareService.KEY_WORK_CYCLE_SECONDS
@@ -35,9 +40,14 @@ class MainActivity : Activity() {
     private lateinit var tvUsageCountdown: TextView
     private lateinit var tvCountdownTip: TextView
 
+    // 权限动态警示看板控件
+    private lateinit var layoutPermissionCard: LinearLayout
+    private lateinit var tvPermissionTitle: TextView
+    private lateinit var tvPermissionDesc: TextView
+    private lateinit var btnOpenSpecialPermissions: Button
+
     private lateinit var btnToggleService: Button
     private lateinit var btnTriggerTest: Button
-    private lateinit var btnOpenSpecialPermissions: Button
 
     // 运行时间预设按钮
     private lateinit var btnCycle10s: Button
@@ -102,6 +112,11 @@ class MainActivity : Activity() {
         tvCountdownTip = findViewById(R.id.tvCountdownTip)
         btnToggleService = findViewById(R.id.btnToggleService)
         btnTriggerTest = findViewById(R.id.btnTriggerTest)
+
+        // 绑定权限看板卡片视图
+        layoutPermissionCard = findViewById(R.id.layoutPermissionCard)
+        tvPermissionTitle = findViewById(R.id.tvPermissionTitle)
+        tvPermissionDesc = findViewById(R.id.tvPermissionDesc)
         btnOpenSpecialPermissions = findViewById(R.id.btnOpenSpecialPermissions)
 
         // 绑定跳转系统权限设置页
@@ -153,7 +168,7 @@ class MainActivity : Activity() {
             updateUI()
         }
 
-        // 启动 / 停止护眼服务
+        // 启动 / 停止护眼服务（增加国内手机后台弹出界面权限深度校验与拦截预警）
         btnToggleService.setOnClickListener {
             if (!hasOverlayPermission()) {
                 requestOverlayPermission()
@@ -163,7 +178,21 @@ class MainActivity : Activity() {
             if (isServiceRunning) {
                 stopEyeCareService()
             } else {
-                startEyeCareService()
+                // 若检测到关键【后台弹出界面】被系统拦截，弹窗明确提示用户
+                if (!hasBackgroundPopupPermission()) {
+                    AlertDialog.Builder(this)
+                        .setTitle("⚠️ 关键权限未开启提示")
+                        .setMessage("检测到系统尚未允许【后台弹出界面】权限！\n\n小米/澎湃OS/vivo等机型在未开启此权限时，切出后台玩游戏时间到了会被系统强制拦截遮罩，只有切回本软件才会弹窗。\n\n强烈建议现在前往开启！")
+                        .setPositiveButton("立即前往开启") { _, _ ->
+                            openSpecialPermissionSettings()
+                        }
+                        .setNegativeButton("仍要直接启动") { _, _ ->
+                            startEyeCareService()
+                        }
+                        .show()
+                } else {
+                    startEyeCareService()
+                }
             }
         }
 
@@ -326,13 +355,75 @@ class MainActivity : Activity() {
     }
 
     /**
-     * 检查是否具备全屏悬浮窗权限
+     * 检查是否具备全屏悬浮窗权限 (标准 SYSTEM_ALERT_WINDOW)
      */
     private fun hasOverlayPermission(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             Settings.canDrawOverlays(this)
         } else {
             true
+        }
+    }
+
+    /**
+     * 深度检测当前设备是否具备【后台弹出界面】权限（针对小米 MIUI/澎湃 OS、vivo、OPPO 等）
+     * OP_BACKGROUND_START_ACTIVITY 对应 code 为 10021
+     * 这是导致“切出玩别的即使时间到了也不弹窗，切回应用才立刻弹窗”的绝对核心元凶
+     */
+    private fun hasBackgroundPopupPermission(): Boolean {
+        val appOps = getSystemService(Context.APP_OPS_SERVICE) as? AppOpsManager ?: return true
+        return try {
+            val method = AppOpsManager::class.java.getMethod(
+                "checkOpNoThrow",
+                Int::class.javaPrimitiveType,
+                Int::class.javaPrimitiveType,
+                String::class.java
+            )
+            // 10021 是小米/澎湃OS定义的 OP_BACKGROUND_START_ACTIVITY (后台弹出界面)
+            val result = method.invoke(appOps, 10021, android.os.Process.myUid(), packageName) as Int
+            result == AppOpsManager.MODE_ALLOWED
+        } catch (e: Exception) {
+            // 非小米或不支持此 API 的设备默认放行
+            true
+        }
+    }
+
+    /**
+     * 动态更新权限提示卡片视觉状态
+     * 实时检测悬浮窗权限与后台弹出界面权限，向用户明确呈现当前状态
+     */
+    private fun updatePermissionCardVisual() {
+        val hasOverlay = hasOverlayPermission()
+        val hasBgPopup = hasBackgroundPopupPermission()
+
+        when {
+            !hasOverlay -> {
+                // 缺少基础悬浮窗权限
+                layoutPermissionCard.setBackgroundColor(Color.parseColor("#381919"))
+                tvPermissionTitle.text = "🔴 关键权限未开启：悬浮窗权限"
+                tvPermissionTitle.setTextColor(Color.parseColor("#FF5555"))
+                tvPermissionDesc.text = "展示全屏半透明护眼遮罩必须先开启【显示在其他应用上层】权限。"
+                btnOpenSpecialPermissions.text = "👉 立即开启【悬浮窗】权限"
+                btnOpenSpecialPermissions.setBackgroundColor(Color.parseColor("#9C2727"))
+            }
+            !hasBgPopup -> {
+                // 具备悬浮窗但缺少后台弹出界面权限（小米/澎湃OS等核心元凶）
+                layoutPermissionCard.setBackgroundColor(Color.parseColor("#331E12"))
+                tvPermissionTitle.text = "⚠️ 致命拦截警告：【后台弹出界面】被禁用"
+                tvPermissionTitle.setTextColor(Color.parseColor("#FFA500"))
+                tvPermissionDesc.text = "当前机型默认禁止后台弹窗！切出后台玩游戏时间到了会被系统强制拦截，只有点进本软件才会弹窗。请立即开启！"
+                btnOpenSpecialPermissions.text = "👉 一键直达开启【后台弹出界面】"
+                btnOpenSpecialPermissions.setBackgroundColor(Color.parseColor("#C25E00"))
+            }
+            else -> {
+                // 全部权限就绪
+                layoutPermissionCard.setBackgroundColor(Color.parseColor("#0F281E"))
+                tvPermissionTitle.text = "✅ 后台弹窗权限已就绪"
+                tvPermissionTitle.setTextColor(Color.parseColor("#38EF7D"))
+                tvPermissionDesc.text = "【后台弹出界面】与悬浮窗均已允许，切出后台玩游戏或看视频时，时间到了将准时弹出全屏远眺遮罩。"
+                btnOpenSpecialPermissions.text = "管理权限与省电策略"
+                btnOpenSpecialPermissions.setBackgroundColor(Color.parseColor("#1B4D36"))
+            }
         }
     }
 
@@ -351,19 +442,41 @@ class MainActivity : Activity() {
     }
 
     /**
-     * 打开系统应用权限设置页（重点引导小米/vivo/OPPO/华为用户开启“后台弹出界面”和“悬浮窗”）
+     * 智能直达手机系统权限设置页
+     * 优先直达小米/红米/澎湃OS专属权限编辑页（miui.intent.action.APP_PERM_EDITOR），
+     * 直接展示【后台弹出界面】开关；若失败则降级到通用应用详情页
      */
     private fun openSpecialPermissionSettings() {
+        val brand = Build.BRAND.lowercase()
+        val manufacturer = Build.MANUFACTURER.lowercase()
+        val isXiaomi = brand.contains("xiaomi") || brand.contains("redmi") ||
+                brand.contains("poco") || manufacturer.contains("xiaomi")
+
+        if (isXiaomi) {
+            try {
+                // 小米 / 澎湃OS 专属权限编辑页面（包含【后台弹出界面】开关）
+                val intent = Intent("miui.intent.action.APP_PERM_EDITOR").apply {
+                    setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.AppPermissionsEditorActivity")
+                    putExtra("extra_pkgname", packageName)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(intent)
+                Toast.makeText(this, "请在列表中将【后台弹出界面】和【显示悬浮窗】设置为【允许】", Toast.LENGTH_LONG).show()
+                return
+            } catch (e: Exception) {
+                Log.w(TAG, "打开小米专属权限编辑页失败，降级通用页: ${e.message}")
+            }
+        }
+
         try {
-            // 优先打开当前应用的应用详情权限页
+            // 通用应用详情页（所有安卓设备支持）
             val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                 data = Uri.fromParts("package", packageName, null)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             startActivity(intent)
-            Toast.makeText(this, "请在设置中开启【后台弹出界面】、【悬浮窗】与【省电策略无限制】", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "请进入【权限管理】，开启【后台弹出界面】与【悬浮窗】", Toast.LENGTH_LONG).show()
         } catch (e: Exception) {
-            // 降级尝试标准悬浮窗管理页
             requestOverlayPermission()
         }
     }
@@ -371,6 +484,7 @@ class MainActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_CODE_OVERLAY_PERMISSION) {
+            updatePermissionCardVisual()
             if (hasOverlayPermission()) {
                 Toast.makeText(this, "悬浮窗权限已授予！", Toast.LENGTH_SHORT).show()
                 updateUI()
@@ -416,6 +530,7 @@ class MainActivity : Activity() {
         super.onResume()
         updatePresetButtonsVisual()
         updateCountdownUI()
+        updatePermissionCardVisual()
         uiUpdateHandler.post(uiUpdateRunnable)
     }
 

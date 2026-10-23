@@ -293,6 +293,37 @@
                 android:layout_marginTop="2dp" />
         </LinearLayout>
 
+        <!-- 防快速清理 / 防误杀模式卡片 (紧凑) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#171E2B"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:layout_marginBottom="10dp">
+
+            <Switch
+                android:id="@+id/switchAntiKill"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="🛡️ 防快速清理 / 防误杀模式"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:checked="true" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="多任务中隐藏卡片，快速杀后台绝不误杀；划除后1秒自动拉活"
+                android:textColor="#8896AA"
+                android:textSize="11sp"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+
         <!-- 主控操作按钮 (紧凑) -->
         <Button
             android:id="@+id/btnToggleService"

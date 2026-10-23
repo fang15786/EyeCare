@@ -1,6 +1,7 @@
 package com.eyecare.app
 
 import android.app.Activity
+import android.app.ActivityManager
 import android.app.AlertDialog
 import android.app.AppOpsManager
 import android.content.Context
@@ -34,6 +35,7 @@ class MainActivity : Activity() {
         private const val KEY_WORK_CYCLE_SECONDS = EyeCareService.KEY_WORK_CYCLE_SECONDS
         private const val KEY_PAUSE_MEDIA = EyeCareService.KEY_PAUSE_MEDIA
         private const val KEY_SERVICE_ENABLED = EyeCareService.KEY_SERVICE_ENABLED
+        private const val KEY_ANTI_KILL = EyeCareService.KEY_ANTI_KILL
     }
 
     // 倒计时核心看板控件
@@ -64,9 +66,13 @@ class MainActivity : Activity() {
     // 音视频暂停联动开关
     private lateinit var switchPauseMedia: Switch
 
+    // 防快速清理 / 防误杀模式开关
+    private lateinit var switchAntiKill: Switch
+
     private var isServiceRunning = false
     private var selectedCycleSeconds = EyeCareService.DEFAULT_WORK_CYCLE_SECONDS
     private var isPauseMediaEnabled = true
+    private var isAntiKillEnabled = true
 
     // 前台每秒刷新倒计时 Handler
     private val uiUpdateHandler = Handler(Looper.getMainLooper())
@@ -83,6 +89,7 @@ class MainActivity : Activity() {
 
         loadSavedPreferences()
         initViews()
+        applyAntiKillMode(isAntiKillEnabled)
         updatePresetButtonsVisual()
         updateCountdownUI()
     }
@@ -94,6 +101,7 @@ class MainActivity : Activity() {
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         selectedCycleSeconds = prefs.getInt(KEY_WORK_CYCLE_SECONDS, EyeCareService.DEFAULT_WORK_CYCLE_SECONDS)
         isPauseMediaEnabled = prefs.getBoolean(KEY_PAUSE_MEDIA, true)
+        isAntiKillEnabled = prefs.getBoolean(KEY_ANTI_KILL, true)
     }
 
     /**
@@ -104,14 +112,16 @@ class MainActivity : Activity() {
         prefs.edit()
             .putInt(KEY_WORK_CYCLE_SECONDS, selectedCycleSeconds)
             .putBoolean(KEY_PAUSE_MEDIA, isPauseMediaEnabled)
+            .putBoolean(KEY_ANTI_KILL, isAntiKillEnabled)
             .apply()
     }
 
+    /**
+     * 初始化看板、权限卡片与开关控件
+     */
     private fun initViews() {
         tvUsageCountdown = findViewById(R.id.tvUsageCountdown)
         tvCountdownTip = findViewById(R.id.tvCountdownTip)
-        btnToggleService = findViewById(R.id.btnToggleService)
-        btnTriggerTest = findViewById(R.id.btnTriggerTest)
 
         // 绑定权限看板卡片视图
         layoutPermissionCard = findViewById(R.id.layoutPermissionCard)
@@ -119,11 +129,45 @@ class MainActivity : Activity() {
         tvPermissionDesc = findViewById(R.id.tvPermissionDesc)
         btnOpenSpecialPermissions = findViewById(R.id.btnOpenSpecialPermissions)
 
-        // 绑定跳转系统权限设置页
         btnOpenSpecialPermissions.setOnClickListener {
             openSpecialPermissionSettings()
         }
 
+        // 音视频暂停联动开关
+        switchPauseMedia = findViewById(R.id.switchPauseMedia)
+        switchPauseMedia.isChecked = isPauseMediaEnabled
+        switchPauseMedia.setOnCheckedChangeListener { _, isChecked ->
+            isPauseMediaEnabled = isChecked
+            savePreferences()
+            syncConfigToService()
+            val tip = if (isChecked) "已开启：弹出遮罩时自动暂停抖音等音视频" else "已关闭：弹出遮罩时不打断音视频"
+            Toast.makeText(this, tip, Toast.LENGTH_SHORT).show()
+            updateUI()
+        }
+
+        // 防快速清理 / 防误杀模式开关
+        switchAntiKill = findViewById(R.id.switchAntiKill)
+        switchAntiKill.isChecked = isAntiKillEnabled
+        switchAntiKill.setOnCheckedChangeListener { _, isChecked ->
+            isAntiKillEnabled = isChecked
+            savePreferences()
+            applyAntiKillMode(isChecked)
+            val tip = if (isChecked) {
+                "已开启防误杀：已从多任务列表中隐藏，快速清后台绝不误杀！(随时通过通知栏或桌面进入)"
+            } else {
+                "已关闭防误杀：将在多任务列表中正常显示卡片"
+            }
+            Toast.makeText(this, tip, Toast.LENGTH_SHORT).show()
+        }
+
+        initPresetTimeButtons()
+        initServiceActionButtons()
+    }
+
+    /**
+     * 初始化运行时间预设按钮与自定义输入
+     */
+    private fun initPresetTimeButtons() {
         btnCycle10s = findViewById(R.id.btnCycle10s)
         btnCycle10m = findViewById(R.id.btnCycle10m)
         btnCycle15m = findViewById(R.id.btnCycle15m)
@@ -131,14 +175,6 @@ class MainActivity : Activity() {
         btnCycle30m = findViewById(R.id.btnCycle30m)
         btnCycle45m = findViewById(R.id.btnCycle45m)
 
-        etCustomMinutes = findViewById(R.id.etCustomMinutes)
-        btnApplyCustomCycle = findViewById(R.id.btnApplyCustomCycle)
-        switchPauseMedia = findViewById(R.id.switchPauseMedia)
-
-        // 初始填充设置值
-        switchPauseMedia.isChecked = isPauseMediaEnabled
-
-        // 绑定预设时间点击事件
         btnCycle10s.setOnClickListener { selectCycle(10, "10秒快速测试") }
         btnCycle10m.setOnClickListener { selectCycle(10 * 60, "10分钟") }
         btnCycle15m.setOnClickListener { selectCycle(15 * 60, "15分钟") }
@@ -146,7 +182,8 @@ class MainActivity : Activity() {
         btnCycle30m.setOnClickListener { selectCycle(30 * 60, "30分钟") }
         btnCycle45m.setOnClickListener { selectCycle(45 * 60, "45分钟") }
 
-        // 应用自定义分钟数
+        etCustomMinutes = findViewById(R.id.etCustomMinutes)
+        btnApplyCustomCycle = findViewById(R.id.btnApplyCustomCycle)
         btnApplyCustomCycle.setOnClickListener {
             val text = etCustomMinutes.text.toString().trim()
             val minutes = text.toIntOrNull()
@@ -157,18 +194,15 @@ class MainActivity : Activity() {
                 Toast.makeText(this, "请输入有效的分钟数 (大于0)", Toast.LENGTH_SHORT).show()
             }
         }
+    }
 
-        // 音视频暂停联动开关监听
-        switchPauseMedia.setOnCheckedChangeListener { _, isChecked ->
-            isPauseMediaEnabled = isChecked
-            savePreferences()
-            syncConfigToService()
-            val tip = if (isChecked) "已开启：弹出遮罩时自动暂停抖音等音视频" else "已关闭：弹出遮罩时不打断音视频"
-            Toast.makeText(this, tip, Toast.LENGTH_SHORT).show()
-            updateUI()
-        }
+    /**
+     * 初始化主控启停与测试操作按钮
+     */
+    private fun initServiceActionButtons() {
+        btnToggleService = findViewById(R.id.btnToggleService)
+        btnTriggerTest = findViewById(R.id.btnTriggerTest)
 
-        // 启动 / 停止护眼服务（增加国内手机后台弹出界面权限深度校验与拦截预警）
         btnToggleService.setOnClickListener {
             if (!hasOverlayPermission()) {
                 requestOverlayPermission()
@@ -178,7 +212,6 @@ class MainActivity : Activity() {
             if (isServiceRunning) {
                 stopEyeCareService()
             } else {
-                // 若检测到关键【后台弹出界面】被系统拦截，弹窗明确提示用户
                 if (!hasBackgroundPopupPermission()) {
                     AlertDialog.Builder(this)
                         .setTitle("⚠️ 关键权限未开启提示")
@@ -196,7 +229,6 @@ class MainActivity : Activity() {
             }
         }
 
-        // 立即弹出遮罩测试
         btnTriggerTest.setOnClickListener {
             if (!hasOverlayPermission()) {
                 requestOverlayPermission()
@@ -206,6 +238,27 @@ class MainActivity : Activity() {
                 action = EyeCareService.ACTION_TRIGGER_TEST
             }
             startService(intent)
+        }
+    }
+
+    /**
+     * 动态应用防误杀保护模式（从多任务列表中隐藏或显示卡片）
+     * 核心机制：
+     * 1. 调用 ActivityManager.AppTask.setExcludeFromRecents(enabled)，在多任务列表中动态隐藏卡片；
+     * 2. 当用户在多任务界面快速划掉应用或点击“一键清理”时，列表中不存在 EyeCare 卡片，彻底免疫被误杀；
+     * 3. 用户可通过桌面图标或常驻通知随时秒开本界面。
+     */
+    private fun applyAntiKillMode(enabled: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            try {
+                val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+                am?.appTasks?.forEach { task ->
+                    task.setExcludeFromRecents(enabled)
+                }
+                Log.d(TAG, "已动态应用 setExcludeFromRecents: $enabled")
+            } catch (e: Exception) {
+                Log.w(TAG, "设置 setExcludeFromRecents 异常: ${e.message}")
+            }
         }
     }
 
@@ -528,6 +581,7 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        applyAntiKillMode(isAntiKillEnabled)
         updatePresetButtonsVisual()
         updateCountdownUI()
         updatePermissionCardVisual()

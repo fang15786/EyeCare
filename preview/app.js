@@ -32,7 +32,9 @@ const appState = {
   // 当前手机模拟场景：'video' (抖音短视频) 或 'article' (深度阅读)
   currentScene: 'video',
   // 是否开启遮罩弹出时自动暂停音视频
-  pauseMediaEnabled: true
+  pauseMediaEnabled: true,
+  // 是否开启防快速清理 / 防误杀保护模式
+  antiKillEnabled: true
 };
 
 // ==========================================================================
@@ -79,8 +81,9 @@ const elements = {
   inputRestDuration: document.getElementById('inputRestDuration'),
   valRestDuration: document.getElementById('valRestDuration'),
 
-  // 音视频暂停联动
+  // 音视频暂停联动与防误杀保护
   checkPauseMedia: document.getElementById('checkPauseMedia'),
+  checkAntiKill: document.getElementById('checkAntiKill'),
   btnToggleScene: document.getElementById('btnToggleScene'),
 
   // 视觉参数调节输入
@@ -403,6 +406,13 @@ function bindControlInputs() {
     appState.pauseMediaEnabled = e.target.checked;
     updateMediaPlaybackVisual();
   });
+
+  // 防快速清理 / 防误杀保护开关
+  if (elements.checkAntiKill) {
+    elements.checkAntiKill.addEventListener('change', (e) => {
+      appState.antiKillEnabled = e.target.checked;
+    });
+  }
 
   // 预设时长胶囊按钮点击
   elements.presetChips.forEach(chip => {

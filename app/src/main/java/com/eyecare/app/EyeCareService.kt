@@ -56,6 +56,7 @@ class EyeCareService : Service() {
         const val KEY_PAUSE_MEDIA = "pref_pause_media"
         const val KEY_ACCUMULATED_SECONDS = "pref_accumulated_seconds"
         const val KEY_SERVICE_ENABLED = "pref_service_enabled"
+        const val KEY_ANTI_KILL = "pref_anti_kill"
 
         // 标准工作周期：20 分钟 = 1200 秒
         const val DEFAULT_WORK_CYCLE_SECONDS = 20 * 60
@@ -792,9 +793,19 @@ class EyeCareService : Service() {
     }
 
     /**
-     * 构建低优先级前台通知
+     * 构建低优先级前台通知，附带点击直达 MainActivity 的意图（防误杀隐形卡片时便于用户秒开）
      */
     private fun buildSilentNotification(content: String): Notification {
+        val clickIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            clickIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
         } else {
@@ -806,6 +817,7 @@ class EyeCareService : Service() {
             .setContentTitle("EyeCare 护眼守护中")
             .setContentText(content)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentIntent(pendingIntent)
             .setOngoing(true)
             .build()
     }
@@ -921,6 +933,53 @@ class EyeCareService : Service() {
             Log.d(TAG, "已释放瞬态音频焦点，已通知外部音视频恢复播放")
         } catch (e: Exception) {
             Log.e(TAG, "释放瞬态音频焦点异常: ${e.message}", e)
+        }
+    }
+
+    /**
+     * 当用户在手机多任务界面划掉/清除本应用卡片时触发该回调
+     * 核心自愈拉活机制：
+     * 1. 即使应用界面被快速划除，只要用户已启用护眼守护 (KEY_SERVICE_ENABLED == true)，
+     *    立即通过底层硬件 AlarmManager 预设 1 秒后自动拉起 EyeCareService 前台服务。
+     * 2. 彻底解决用户快速杀进程导致护眼服务被误杀且遗忘再次打开的问题。
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        Log.w(TAG, "检测到任务卡片被划除/快速杀任务 (onTaskRemoved)")
+
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val isServiceEnabled = prefs.getBoolean(KEY_SERVICE_ENABLED, false)
+
+        if (isServiceEnabled) {
+            try {
+                val cycleSeconds = prefs.getInt(KEY_WORK_CYCLE_SECONDS, DEFAULT_WORK_CYCLE_SECONDS)
+                val pauseMedia = prefs.getBoolean(KEY_PAUSE_MEDIA, true)
+
+                val restartIntent = Intent(applicationContext, EyeCareService::class.java).apply {
+                    action = ACTION_START
+                    putExtra(EXTRA_WORK_CYCLE_SECONDS, cycleSeconds)
+                    putExtra(EXTRA_PAUSE_MEDIA, pauseMedia)
+                }
+
+                val restartPendingIntent = PendingIntent.getService(
+                    applicationContext,
+                    888,
+                    restartIntent,
+                    PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
+                )
+
+                val am = getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+                val triggerAt = SystemClock.elapsedRealtime() + 1000L
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    am?.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, restartPendingIntent)
+                } else {
+                    am?.setExact(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, restartPendingIntent)
+                }
+                Log.i(TAG, "已为 EyeCareService 预设 1 秒后硬件闹钟自动自愈拉活")
+            } catch (e: Exception) {
+                Log.e(TAG, "onTaskRemoved 自动拉活异常: ${e.message}", e)
+            }
         }
     }
 
